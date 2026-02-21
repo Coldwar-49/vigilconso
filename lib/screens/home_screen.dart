@@ -83,19 +83,15 @@ class _HomeScreenState extends State<HomeScreen> {
           : null,
       body: RefreshIndicator(
         onRefresh: () => _loadLatestRappels(forceRefresh: true),
-        child: LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            controller: _scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: IntrinsicHeight(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [_buildHeader(context), Expanded(child: _buildMainContent(context))],
-                ),
-              ),
-            ),
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(context),
+              _buildMainContent(context),
+            ],
           ),
         ),
       ),
