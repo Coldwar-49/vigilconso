@@ -485,8 +485,16 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
   }
 
   Widget _buildInfoRow(String label, dynamic value) {
-    final String textValue =
-        (value?.toString() ?? '').isEmpty ? 'Non spécifié' : value.toString();
+    String textValue;
+    if (value == null) {
+      textValue = 'Non spécifié';
+    } else if (value is List) {
+      final joined = value.join(', ');
+      textValue = joined.isEmpty ? 'Non spécifié' : joined;
+    } else {
+      final str = value.toString();
+      textValue = str.isEmpty ? 'Non spécifié' : str;
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
@@ -507,19 +515,26 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
     );
   }
 
-  String _extractDDM(String? identification) {
-    if (identification == null || identification.isEmpty)
-      return 'Non disponible';
+  String _extractDDM(dynamic identification) {
+    // L'API peut retourner une String, une List, ou null
+    String text;
+    if (identification == null) return 'Non disponible';
+    if (identification is List) {
+      text = identification.join(' ');
+    } else {
+      text = identification.toString();
+    }
+    if (text.trim().isEmpty) return 'Non disponible';
 
     final ddmMatches = RegExp(r'date de durabilité minimale\$([\d-]+)')
-        .allMatches(identification);
+        .allMatches(text);
     if (ddmMatches.isNotEmpty) {
       return ddmMatches.map((m) => m.group(1)).join(', ');
     }
 
     final dateMatches =
         RegExp(r'\b(\d{2}[/-]\d{2}[/-]\d{4}|\d{4}[/-]\d{2}[/-]\d{2})\b')
-            .allMatches(identification);
+            .allMatches(text);
     if (dateMatches.isNotEmpty) {
       return dateMatches.map((m) => m.group(0)).join(', ');
     }
