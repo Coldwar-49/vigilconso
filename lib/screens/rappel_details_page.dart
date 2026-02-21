@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
+import 'package:vigiconso/services/favorites_service.dart';
 
 class RappelDetailsPage extends StatefulWidget {
   final dynamic rappel;
@@ -13,6 +14,35 @@ class RappelDetailsPage extends StatefulWidget {
 class _RappelDetailsPageState extends State<RappelDetailsPage> {
   bool _isFullScreenImage = false;
   String? _fullScreenImageUrl;
+  bool _isFavorite = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFavoriteStatus();
+  }
+
+  Future<void> _checkFavoriteStatus() async {
+    final id = widget.rappel['reference_fiche'] ?? widget.rappel['libelle'] ?? '';
+    final fav = await FavoritesService.isFavorite(id);
+    if (mounted) setState(() => _isFavorite = fav);
+  }
+
+  Future<void> _toggleFavorite() async {
+    await FavoritesService.toggleFavorite(Map<String, dynamic>.from(widget.rappel));
+    final id = widget.rappel['reference_fiche'] ?? widget.rappel['libelle'] ?? '';
+    final fav = await FavoritesService.isFavorite(id);
+    if (mounted) {
+      setState(() => _isFavorite = fav);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isFavorite ? 'Ajouté aux favoris' : 'Retiré des favoris'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +54,17 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
           : AppBar(
               title: Text(widget.rappel['libelle'] ?? 'Détails du rappel'),
               centerTitle: true,
-              actions: const [AppMenu()],
+              actions: [
+                IconButton(
+                  icon: Icon(
+                    _isFavorite ? Icons.favorite : Icons.favorite_border,
+                    color: _isFavorite ? Colors.red : null,
+                  ),
+                  tooltip: _isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris',
+                  onPressed: _toggleFavorite,
+                ),
+                const AppMenu(),
+              ],
             ),
       body: _isFullScreenImage
           ? _buildFullScreenImage()
