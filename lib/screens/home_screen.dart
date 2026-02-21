@@ -387,21 +387,21 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               keyboardType: TextInputType.emailAddress,
               validator: (value) {
-                if (value == null || value.isEmpty || \!value.contains('@') || \!value.contains('.')) return 'Adresse email invalide';
+                if (value == null || value.isEmpty || !value.contains('@') || !value.contains('.')) return 'Adresse email invalide';
                 return null;
               },
             ),
             const SizedBox(height: 12),
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
-              child: _subscriptionMessage \!= null
+              child: _subscriptionMessage != null
                   ? Padding(
-                      key: ValueKey(_subscriptionMessage),
+                      key: ValueKey<String>(_subscriptionMessage!),
                       padding: const EdgeInsets.only(bottom: 10),
                       child: Row(children: [
                         Icon(_isError ? Icons.error : Icons.check_circle, color: _isError ? Colors.red : Colors.green, size: 18),
                         const SizedBox(width: 8),
-                        Expanded(child: Text(_subscriptionMessage\!, style: TextStyle(color: _isError ? Colors.red : Colors.green, fontWeight: FontWeight.bold))),
+                        Expanded(child: Text(_subscriptionMessage!, style: TextStyle(color: _isError ? Colors.red : Colors.green, fontWeight: FontWeight.bold))),
                       ]),
                     )
                   : const SizedBox.shrink(),
@@ -423,13 +423,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _subscribeToNewsletter() async {
-    if (\!_formKey.currentState\!.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
     final email = _emailController.text.trim();
     setState(() { _isSubscribing = true; _subscriptionMessage = null; });
     final result = await subscribeToNewsletter(email);
     setState(() {
       _isSubscribing = false;
-      _isError = \!result['success'];
+      _isError = !result['success'];
       _subscriptionMessage = result['message'];
       if (result['success']) _emailController.clear();
     });
