@@ -198,7 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
         else if (_latestRappels.isEmpty)
           const Center(child: Text('Aucune alerte disponible.', style: TextStyle(color: Colors.grey)))
         else
-          ..._latestRappels.map((r) => _buildLatestRappelCard(r, context)),
+          ...List.generate(_latestRappels.length, (i) => _buildLatestRappelCard(_latestRappels[i], context)),
         const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
@@ -322,36 +322,47 @@ class _HomeScreenState extends State<HomeScreen> {
       {'icon': Icons.favorite, 'title': 'Favoris', 'description': 'Sauvegardez les rappels.', 'color': Colors.red},
       {'icon': Icons.search, 'title': 'Recherche', 'description': 'Trouvez par marque ou ref.', 'color': Colors.orange},
     ];
+    Widget featureCard(Map<String, dynamic> f) {
+      final color = f['color'] as Color;
+      return Expanded(
+        child: Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                child: Icon(f['icon'] as IconData, size: 24, color: color),
+              ),
+              const SizedBox(height: 10),
+              Text(f['title'] as String, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+              const SizedBox(height: 4),
+              Text(f['description'] as String, style: const TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
+            ]),
+          ),
+        ),
+      );
+    }
+
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _buildSectionTitle('Fonctionnalites', Colors.purple),
       const SizedBox(height: 14),
-      GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 1.1, crossAxisSpacing: 12, mainAxisSpacing: 12),
-        itemCount: features.length,
-        itemBuilder: (context, index) {
-          final f = features[index];
-          final color = f['color'] as Color;
-          return Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Container(
-                  width: 44, height: 44,
-                  decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                  child: Icon(f['icon'] as IconData, size: 24, color: color),
-                ),
-                const SizedBox(height: 10),
-                Text(f['title'] as String, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                const SizedBox(height: 4),
-                Text(f['description'] as String, style: const TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
-              ]),
-            ),
-          );
-        },
+      IntrinsicHeight(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          featureCard(features[0]),
+          const SizedBox(width: 12),
+          featureCard(features[1]),
+        ]),
+      ),
+      const SizedBox(height: 12),
+      IntrinsicHeight(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          featureCard(features[2]),
+          const SizedBox(width: 12),
+          featureCard(features[3]),
+        ]),
       ),
     ]);
   }
