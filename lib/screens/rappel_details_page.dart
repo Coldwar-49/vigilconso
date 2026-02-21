@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
 import 'package:vigiconso/services/favorites_service.dart';
 
@@ -258,58 +257,44 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
     );
   }
 
+  /// Retourne l'URL de l'image en passant par un proxy CORS si on est sur Web.
+  /// wsrv.nl est un CDN/proxy gratuit qui ajoute les headers CORS manquants.
+  String _proxiedImageUrl(String url) {
+    if (!kIsWeb) return url;
+    final encoded = Uri.encodeComponent(url);
+    return 'https://wsrv.nl/?url=$encoded&output=jpg&q=85';
+  }
+
   Widget _buildNetworkImageWithFallback(
     String url, {
     BoxFit fit = BoxFit.cover,
     required Widget Function(BuildContext) hasError,
   }) {
-    // Sur Web : CORS bloque le chargement des images depuis rappel.conso.gouv.fr
-    // On affiche un bouton cliquable qui ouvre l'image dans un nouvel onglet
-    if (kIsWeb) {
-      return GestureDetector(
-        onTap: () async {
-          final uri = Uri.parse(url);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          }
-        },
-        child: Container(
-          color: Colors.grey[100],
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.open_in_new, size: 44, color: Colors.grey[400]),
-              const SizedBox(height: 10),
-              Text(
-                'Cliquer pour voir l\'image',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 13,
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    final imageUrl = _proxiedImageUrl(url);
 
-    // Sur mobile : chargement natif sans restriction CORS
-    try {
-      return FadeInImage.assetNetwork(
-        placeholder: 'assets/images/placeholder.png',
-        image: url,
-        fit: fit,
-        fadeInDuration: const Duration(milliseconds: 300),
-        imageErrorBuilder: (context, error, stackTrace) {
-          debugPrint('Erreur image: $error');
-          return hasError(context);
-        },
-      );
-    } catch (e) {
-      debugPrint('Exception image: $e');
-      return hasError(context);
-    }
+    return Image.network(
+      imageUrl,
+      fit: fit,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Container(
+          color: Colors.grey[100],
+          child: Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                  : null,
+              strokeWidth: 2,
+            ),
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint('Erreur image: $error');
+        return hasError(context);
+      },
+    );
   }
 
   Widget _buildHeaderSection() {
