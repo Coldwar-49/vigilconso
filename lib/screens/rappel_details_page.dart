@@ -161,21 +161,22 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
   }
 
   Widget _buildImagesSection(List<String> imageUrls) {
+    final cs = Theme.of(context).colorScheme;
     if (imageUrls.isEmpty) {
       return Container(
         height: 200,
         width: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.grey[200],
+          color: cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Center(
+        child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
-              SizedBox(height: 8),
-              Text('Aucune image disponible'),
+              Icon(Icons.image_not_supported, size: 50, color: cs.outline),
+              const SizedBox(height: 8),
+              Text('Aucune image disponible', style: TextStyle(color: cs.onSurfaceVariant)),
             ],
           ),
         ),
@@ -219,16 +220,17 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
                         child: _buildNetworkImageWithFallback(
                           imageUrls[index],
                           fit: BoxFit.cover,
-                          hasError: (context) => Container(
-                            color: Colors.grey[200],
-                            child: const Center(
+                          hasError: (ctx) => Container(
+                            color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                            child: Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.image_not_supported,
-                                      size: 40, color: Colors.grey),
-                                  SizedBox(height: 8),
-                                  Text('Image non disponible'),
+                                  Icon(Icons.image_not_supported, size: 40,
+                                      color: Theme.of(ctx).colorScheme.outline),
+                                  const SizedBox(height: 8),
+                                  Text('Image non disponible',
+                                      style: TextStyle(color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
                                 ],
                               ),
                             ),
@@ -248,7 +250,7 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
             child: Text(
               'Faites défiler pour voir plus d\'images (${imageUrls.length})',
               style: TextStyle(
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -278,7 +280,7 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;
         return Container(
-          color: Colors.grey[100],
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
           child: Center(
             child: CircularProgressIndicator(
               value: loadingProgress.expectedTotalBytes != null
@@ -374,8 +376,9 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
 
     final descComp = (widget.rappel['description_complementaire_risque'] ?? '').toString().trim();
 
+    final cs = Theme.of(context).colorScheme;
     return Card(
-      color: Colors.orange[50],
+      color: cs.tertiaryContainer.withOpacity(0.5),
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -383,15 +386,15 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.red),
-                SizedBox(width: 8),
+                Icon(Icons.warning_amber_rounded, color: cs.error),
+                const SizedBox(width: 8),
                 Text(
                   'Risque identifié',
                   style: TextStyle(
                     fontSize: 18,
-                    color: Colors.red,
+                    color: cs.error,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -399,8 +402,8 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
             ),
             const SizedBox(height: 12),
             if (risques.isEmpty)
-              const Text('Information non disponible',
-                  style: TextStyle(fontSize: 15, color: Colors.grey))
+              Text('Information non disponible',
+                  style: TextStyle(fontSize: 15, color: cs.onSurfaceVariant))
             else
               Wrap(
                 spacing: 8,
@@ -408,10 +411,10 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
                 children: risques.map((r) => Chip(
                   label: Text(
                     _capitalize(r),
-                    style: const TextStyle(fontSize: 13, color: Colors.red, fontWeight: FontWeight.w600),
+                    style: TextStyle(fontSize: 13, color: cs.onErrorContainer, fontWeight: FontWeight.w600),
                   ),
-                  backgroundColor: Colors.red[50],
-                  side: BorderSide(color: Colors.red.shade200),
+                  backgroundColor: cs.errorContainer,
+                  side: BorderSide(color: cs.error.withOpacity(0.4)),
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                 )).toList(),
               ),
@@ -445,8 +448,9 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
       actionsList = [];
     }
 
+    final cs = Theme.of(context).colorScheme;
     return Card(
-      color: Colors.red[50],
+      color: cs.errorContainer.withOpacity(0.5),
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -454,18 +458,18 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Consignes de sécurité',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.red,
+                color: cs.error,
               ),
             ),
             const SizedBox(height: 10),
             if (actionsList.isEmpty)
-              const Text('Information non disponible',
-                  style: TextStyle(fontSize: 15, color: Colors.grey))
+              Text('Information non disponible',
+                  style: TextStyle(fontSize: 15, color: cs.onSurfaceVariant))
             else
               ...actionsList.map(
                 (action) => Padding(
@@ -473,7 +477,7 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.red),
+                      Icon(Icons.arrow_forward_ios, size: 14, color: cs.error),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(

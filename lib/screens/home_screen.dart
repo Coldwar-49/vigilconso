@@ -482,9 +482,11 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: InputDecoration(
                 labelText: 'Votre adresse email',
                 hintText: 'exemple@email.com',
+                hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                filled: true, fillColor: Colors.grey.shade50,
-                prefixIcon: const Icon(Icons.email),
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                prefixIcon: Icon(Icons.email, color: Theme.of(context).colorScheme.primary),
               ),
               keyboardType: TextInputType.emailAddress,
               validator: (value) {

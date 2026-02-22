@@ -344,7 +344,7 @@ class _RappelListScreenState extends State<RappelListScreen>
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;
         return Container(
-          color: Colors.grey[100],
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
           child: const Center(
             child: SizedBox(
               width: 24, height: 24,
@@ -356,8 +356,8 @@ class _RappelListScreenState extends State<RappelListScreen>
       errorBuilder: (context, error, stackTrace) =>
           errorBuilder?.call(context) ??
           Container(
-            color: Colors.grey[200],
-            child: const Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Icon(Icons.image_not_supported, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
     );
   }
@@ -368,9 +368,10 @@ class _RappelListScreenState extends State<RappelListScreen>
     required bool selected,
     required VoidCallback onTap,
   }) {
-    final color = selected ? Theme.of(context).colorScheme.primary : Colors.grey.shade200;
-    final textColor = selected ? Colors.white : Colors.grey.shade700;
-    final iconColor = selected ? Colors.white : Colors.grey.shade600;
+    final cs = Theme.of(context).colorScheme;
+    final color = selected ? cs.primary : cs.surfaceContainerHighest;
+    final textColor = selected ? cs.onPrimary : cs.onSurface;
+    final iconColor = selected ? cs.onPrimary : cs.onSurfaceVariant;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),

@@ -71,13 +71,16 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _favorites.isEmpty
               ? Center(
-                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(Icons.favorite_border, size: 80, color: Colors.grey.shade300),
-                    const SizedBox(height: 16),
-                    const Text('Aucun favori pour le moment', style: TextStyle(fontSize: 18, color: Colors.grey)),
-                    const SizedBox(height: 8),
-                    const Text('Ajoutez des rappels en favoris depuis leur page detail.', style: TextStyle(color: Colors.grey), textAlign: TextAlign.center),
-                  ]),
+                  child: Builder(builder: (context) {
+                    final cs = Theme.of(context).colorScheme;
+                    return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(Icons.favorite_border, size: 80, color: cs.surfaceContainerHighest),
+                      const SizedBox(height: 16),
+                      Text('Aucun favori pour le moment', style: TextStyle(fontSize: 18, color: cs.onSurfaceVariant)),
+                      const SizedBox(height: 8),
+                      Text('Ajoutez des rappels en favoris depuis leur page detail.', style: TextStyle(color: cs.onSurfaceVariant), textAlign: TextAlign.center),
+                    ]);
+                  }),
                 )
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
@@ -106,7 +109,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                             Expanded(
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                 Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
-                                if (brand.isNotEmpty) Text(brand, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                if (brand.isNotEmpty) Text(brand, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
                               ]),
                             ),
                             IconButton(
