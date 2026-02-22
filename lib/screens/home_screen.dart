@@ -1,11 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:vigiconso/screens/barcode_scanner.dart';
 import 'package:vigiconso/screens/categories_screen.dart';
-import 'package:vigiconso/screens/favorites_screen.dart';
 import 'package:vigiconso/screens/rappel_screen.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
+import 'package:vigiconso/widgets/shimmer_loading.dart';
 import 'package:vigiconso/services/subscribe_to_newsletter.dart';
 import 'package:vigiconso/services/rappel_service.dart';
 import 'package:vigiconso/screens/rappel_details_page.dart';
@@ -69,14 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         systemOverlayStyle: SystemUiOverlayStyle.light,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.favorite, color: Colors.white),
-            tooltip: 'Mes favoris',
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesScreen())),
-          ),
-          const AppMenu(),
-        ],
+        actions: const [AppMenu()],
       ),
       floatingActionButton: _showScrollToTopButton
           ? FloatingActionButton(mini: true, onPressed: _scrollToTop, backgroundColor: primaryColor, child: const Icon(Icons.arrow_upward))
@@ -192,11 +186,17 @@ class _HomeScreenState extends State<HomeScreen> {
         ]),
         const SizedBox(height: 12),
         if (_isLoadingLatest)
-          const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+          // Shimmer skeleton pendant le chargement
+          ...List.generate(3, (_) => const HomeAlertShimmer())
         else if (_latestError != null)
-          Center(child: Text(_latestError!, style: const TextStyle(color: Colors.grey)))
+          Center(child: Text(_latestError!, style: TextStyle(color: Theme.of(context).colorScheme.error)))
         else if (_latestRappels.isEmpty)
-          const Center(child: Text('Aucune alerte disponible.', style: TextStyle(color: Colors.grey)))
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text('Aucune alerte disponible.', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            ),
+          )
         else
           ...List.generate(_latestRappels.length, (i) => _buildLatestRappelCard(_latestRappels[i], context)),
         const SizedBox(height: 8),
@@ -212,10 +212,34 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     );
   }
+  /// Extrait la première URL d'image valide depuis le champ liens_vers_les_images
+  String? _extractFirstImageUrl(dynamic imagesData) {
+    if (imagesData is String && imagesData.isNotEmpty) {
+      final parts = imagesData.split(RegExp(r'[,;\s]+'));
+      for (final part in parts) {
+        final trimmed = part.trim();
+        if (trimmed.startsWith('http')) return trimmed;
+      }
+    } else if (imagesData is List) {
+      for (final item in imagesData) {
+        if (item is String && item.startsWith('http')) return item;
+      }
+    }
+    return null;
+  }
+
+  /// Retourne l'URL proxiée via wsrv.nl sur Web pour contourner le CORS
+  String _proxiedUrl(String url) {
+    if (!kIsWeb) return url;
+    final encoded = Uri.encodeComponent(url);
+    return 'https://wsrv.nl/?url=$encoded&output=jpg&q=85';
+  }
+
   Widget _buildLatestRappelCard(dynamic rappel, BuildContext context) {
     final title = rappel['libelle'] ?? rappel['libelle_produit'] ?? 'Produit sans nom';
     final brand = rappel['marque_produit'] ?? rappel['nom_marque'] ?? '';
     final dateStr = rappel['date_publication'] ?? '';
+    final colorScheme = Theme.of(context).colorScheme;
     String formattedDate = '';
     bool isNew = false;
     if (dateStr.isNotEmpty) {
@@ -225,39 +249,69 @@ class _HomeScreenState extends State<HomeScreen> {
         isNew = DateTime.now().difference(parsed).inDays <= 7;
       } catch (_) { formattedDate = dateStr; }
     }
+
+    final rawImageUrl = _extractFirstImageUrl(rappel['liens_vers_les_images']);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 2,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RappelDetailsPage(rappel: rappel))),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           child: Row(children: [
+            // Image 64x64
             Container(
-              width: 48, height: 48,
-              decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.warning_amber, color: Colors.red, size: 26),
+              width: 64,
+              height: 64,
+              clipBehavior: Clip.hardEdge,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: colorScheme.primaryContainer,
+              ),
+              child: rawImageUrl != null
+                  ? Image.network(
+                      _proxiedUrl(rawImageUrl),
+                      width: 64, height: 64,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary)));
+                      },
+                      errorBuilder: (_, __, ___) => Icon(Icons.warning_amber_rounded, color: colorScheme.primary, size: 28),
+                    )
+                  : Icon(Icons.warning_amber_rounded, color: colorScheme.primary, size: 28),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis)),
-                  if (isNew)
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(
+                    child: Text(title,
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, height: 1.3),
+                      maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ),
+                  if (isNew) ...[
+                    const SizedBox(width: 6),
                     Container(
-                      margin: const EdgeInsets.only(left: 6),
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(8)),
-                      child: const Text('NEW', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      decoration: BoxDecoration(color: colorScheme.primary, borderRadius: BorderRadius.circular(8)),
+                      child: Text('NOUVEAU', style: TextStyle(color: colorScheme.onPrimary, fontSize: 9, fontWeight: FontWeight.bold)),
                     ),
+                  ],
                 ]),
-                if (brand.isNotEmpty) Text(brand, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                if (formattedDate.isNotEmpty) Text(formattedDate, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                const SizedBox(height: 4),
+                if (brand.isNotEmpty)
+                  Text(brand, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12)),
+                if (formattedDate.isNotEmpty)
+                  Row(children: [
+                    Icon(Icons.calendar_today_outlined, size: 11, color: colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Text(formattedDate, style: TextStyle(color: colorScheme.primary, fontSize: 11, fontWeight: FontWeight.w500)),
+                  ]),
               ]),
             ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
+            Icon(Icons.chevron_right, color: colorScheme.outline),
           ]),
         ),
       ),

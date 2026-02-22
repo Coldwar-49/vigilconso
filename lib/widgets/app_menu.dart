@@ -1,48 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:vigiconso/screens/categories_screen.dart';
-import 'package:vigiconso/screens/home_screen.dart' as custom;
-import 'package:vigiconso/screens/rappel_screen.dart';
 import 'package:vigiconso/screens/contact_screen.dart';
 import 'package:vigiconso/screens/about_screen.dart';
 
+/// Menu contextuel minimaliste — uniquement Contact et À propos.
+/// La navigation principale (Accueil, Catégories, Favoris, Scanner)
+/// est gérée par la NavigationBar dans MainScreen.
 class AppMenu extends StatelessWidget {
   const AppMenu({super.key});
 
   void _handleMenuSelection(BuildContext context, String value) {
     switch (value) {
-       case 'Accueil':
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const custom.HomeScreen()),
-        );
-        break;
-      case 'categories':
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const CategoriesScreen()),
-        );
-        break;
-      case 'all_recalls':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const RappelListScreen(
-              categoryKey: 'all',
-              categoryTitle: 'Tous les rappels',
-            ),
-          ),
-        );
-        break;
       case 'contact':
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const ContactScreen()),
+          MaterialPageRoute(builder: (_) => const ContactScreen()),
         );
         break;
       case 'about':
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const AboutScreen()),
+          MaterialPageRoute(builder: (_) => const AboutScreen()),
         );
         break;
     }
@@ -51,46 +28,16 @@ class AppMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.menu),
+      icon: const Icon(Icons.more_vert),
       onSelected: (value) => _handleMenuSelection(context, value),
       itemBuilder: (BuildContext context) {
         return const [
           PopupMenuItem<String>(
-            value: 'Accueil',
-            child: Row(
-              children: [
-                Icon(Icons.home, color: Colors.blue),
-                SizedBox(width: 10),
-                Text('Accueil'),
-              ],
-            ),
-          ),
-          PopupMenuItem<String>(
-            value: 'categories',
-            child: Row(
-              children: [
-                Icon(Icons.category, color: Colors.blue),
-                SizedBox(width: 10),
-                Text('Catégories'),
-              ],
-            ),
-          ),
-          PopupMenuItem<String>(
-            value: 'all_recalls',
-            child: Row(
-              children: [
-                Icon(Icons.list_alt, color: Colors.blue),
-                SizedBox(width: 10),
-                Text('Tous les rappels'),
-              ],
-            ),
-          ),
-          PopupMenuItem<String>(
             value: 'contact',
             child: Row(
               children: [
-                Icon(Icons.contact_mail, color: Colors.blue),
-                SizedBox(width: 10),
+                Icon(Icons.contact_mail_outlined),
+                SizedBox(width: 12),
                 Text('Contact'),
               ],
             ),
@@ -99,8 +46,8 @@ class AppMenu extends StatelessWidget {
             value: 'about',
             child: Row(
               children: [
-                Icon(Icons.info, color: Colors.blue),
-                SizedBox(width: 10),
+                Icon(Icons.info_outline),
+                SizedBox(width: 12),
                 Text('À propos'),
               ],
             ),

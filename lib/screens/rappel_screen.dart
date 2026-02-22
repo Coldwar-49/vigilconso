@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:vigiconso/screens/rappel_details_page.dart';
 import 'package:vigiconso/utils/constants.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
+import 'package:vigiconso/widgets/shimmer_loading.dart';
 
 class RappelListScreen extends StatefulWidget {
   final String categoryKey;
@@ -20,7 +22,8 @@ class RappelListScreen extends StatefulWidget {
   State<RappelListScreen> createState() => _RappelListScreenState();
 }
 
-class _RappelListScreenState extends State<RappelListScreen> {
+class _RappelListScreenState extends State<RappelListScreen>
+    with TickerProviderStateMixin {
   bool _isNewestFirst = true;
   List<dynamic> _rappels = [];
   List<dynamic> _filteredRappels = [];
@@ -31,9 +34,16 @@ class _RappelListScreenState extends State<RappelListScreen> {
   static const int _pageSize = AppConstants.pageSize;
   String? _errorMessage;
 
+  // Contrôleur d'animation pour l'apparition staggerée des cartes
+  late AnimationController _staggerController;
+
   @override
   void initState() {
     super.initState();
+    _staggerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
     _fetchRappels();
   }
 
@@ -88,12 +98,7 @@ class _RappelListScreenState extends State<RappelListScreen> {
 
   void _applyYearFilter() {
     setState(() {
-      final int currentYear = DateTime.now().year;
-      _filteredRappels = _rappels.where((rappel) {
-        final String dateStr = rappel['date_publication'] ?? '';
-        final DateTime? date = _parseDate(dateStr);
-        return date != null && date.year == currentYear;
-      }).toList();
+      _filteredRappels = List.from(_rappels);
       _currentPage = 0;
     });
   }
@@ -105,14 +110,18 @@ class _RappelListScreenState extends State<RappelListScreen> {
     });
 
     try {
-      String apiUrl = '${AppConstants.apiBaseUrl}/records?limit=100';
-      apiUrl += '&sort=-date_publication';
+      // Filtre date pour obtenir des données récentes.
+      // L'API ignore sort ET interdit offset+limit > 10000 → on filtre par date.
+      final year = DateTime.now().year - 1;
+      final List<String> filters = ['date_publication >= "$year-01-01"'];
 
       final categoryFilter = AppConstants.getCategoryFilter(widget.categoryKey);
       if (categoryFilter.isNotEmpty) {
-        final encodedFilter = Uri.encodeComponent(categoryFilter);
-        apiUrl += '&where=$encodedFilter';
+        filters.add('($categoryFilter)');
       }
+
+      final apiUrl = '${AppConstants.apiBaseUrl}/records?limit=100'
+          '&where=${Uri.encodeQueryComponent(filters.join(" AND "))}';
 
       final response = await http
           .get(Uri.parse(apiUrl))
@@ -121,13 +130,12 @@ class _RappelListScreenState extends State<RappelListScreen> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['results'] != null) {
-          List<dynamic> results = data['results'];
+          final List<dynamic> results = List<dynamic>.from(data['results']);
 
+          // Tri local (API ignore sort=-date_publication)
           results.sort((a, b) {
-            final String dateStrA = a['date_publication'] ?? '';
-            final String dateStrB = b['date_publication'] ?? '';
-            DateTime? dateA = _parseDate(dateStrA);
-            DateTime? dateB = _parseDate(dateStrB);
+            DateTime? dateA = _parseDate(a['date_publication'] ?? '');
+            DateTime? dateB = _parseDate(b['date_publication'] ?? '');
             dateA ??= DateTime(1900);
             dateB ??= DateTime(1900);
             return _isNewestFirst
@@ -141,6 +149,7 @@ class _RappelListScreenState extends State<RappelListScreen> {
             _currentPage = 0;
             _applyYearFilter();
           });
+          _staggerController.forward(from: 0);
         } else {
           setState(() {
             _isLoading = false;
@@ -169,27 +178,25 @@ class _RappelListScreenState extends State<RappelListScreen> {
     });
 
     try {
+      // Pour la recherche : on filtre sur tout le dataset sans offset
+      // (la recherche textuelle est plus importante que le tri par date)
       String apiUrl = '${AppConstants.apiBaseUrl}/records?limit=100';
-      apiUrl += '&sort=-date_publication';
 
-      List<String> filters = [];
+      final List<String> filters = [];
 
-      final categoryFilter = AppConstants.getCategoryFilter(widget.categoryKey);
-      if (categoryFilter.isNotEmpty) {
-        filters.add('($categoryFilter)');
-      }
+      final catFilter = AppConstants.getCategoryFilter(widget.categoryKey);
+      if (catFilter.isNotEmpty) filters.add('($catFilter)');
 
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.replaceAll('"', '');
-        final searchFilter =
-            '(libelle like "%$query%" or libelle_produit like "%$query%" or '
-            'nom_marque like "%$query%" or modeles_ou_references like "%$query%")';
-        filters.add(searchFilter);
+        filters.add(
+          '(libelle like "%$query%" or libelle_produit like "%$query%" or '
+          'nom_marque like "%$query%" or modeles_ou_references like "%$query%")',
+        );
       }
 
       if (filters.isNotEmpty) {
-        final combinedFilter = filters.join(" AND ");
-        apiUrl += '&where=${Uri.encodeQueryComponent(combinedFilter)}';
+        apiUrl += '&where=${Uri.encodeQueryComponent(filters.join(" AND "))}';
       }
 
       final response = await http
@@ -218,6 +225,7 @@ class _RappelListScreenState extends State<RappelListScreen> {
           _currentPage = 0;
           _applyYearFilter();
         });
+        _staggerController.forward(from: 0);
       } else {
         setState(() {
           _isLoading = false;
@@ -253,18 +261,32 @@ class _RappelListScreenState extends State<RappelListScreen> {
     );
   }
 
+  /// Extrait la première URL valide depuis liens_vers_les_images (String ou List)
   String? _extractFirstImageUrl(dynamic rappel) {
-    final imagesText = rappel['liens_vers_les_images'] ?? '';
-    if (imagesText.isEmpty) return null;
+    final dynamic imagesData = rappel['liens_vers_les_images'];
+    if (imagesData == null) return null;
 
-    final rawUrls = imagesText.split(RegExp(r'[,;\s]+'));
-    for (var url in rawUrls) {
-      final trimmedUrl = url.trim();
-      if (trimmedUrl.startsWith('http')) {
-        return trimmedUrl.replaceAll('"', '').replaceAll("'", "");
+    if (imagesData is String && imagesData.isNotEmpty) {
+      final rawUrls = imagesData.split(RegExp(r'[,;\s]+'));
+      for (var url in rawUrls) {
+        final trimmed = url.trim().replaceAll('"', '').replaceAll("'", "");
+        if (trimmed.startsWith('http')) return trimmed;
+      }
+    } else if (imagesData is List) {
+      for (final item in imagesData) {
+        if (item is String && item.trim().startsWith('http')) {
+          return item.trim();
+        }
       }
     }
     return null;
+  }
+
+  /// Proxy wsrv.nl sur Web pour contourner le CORS des images
+  String _proxiedUrl(String url) {
+    if (!kIsWeb) return url;
+    final encoded = Uri.encodeComponent(url);
+    return 'https://wsrv.nl/?url=$encoded&output=jpg&q=85';
   }
 
   Widget _buildNetworkImageWithFallback(
@@ -272,287 +294,338 @@ class _RappelListScreenState extends State<RappelListScreen> {
     BoxFit fit = BoxFit.cover,
     Widget Function(BuildContext)? errorBuilder,
   }) {
-    try {
-      return FadeInImage.assetNetwork(
-        placeholder: 'assets/images/placeholder.png',
-        image: url,
-        fit: fit,
-        fadeInDuration: const Duration(milliseconds: 300),
-        imageErrorBuilder: (context, error, stackTrace) {
-          return errorBuilder?.call(context) ??
-              Container(
-                color: Colors.grey[200],
-                child: const Icon(Icons.image_not_supported,
-                    size: 40, color: Colors.grey),
-              );
-        },
-      );
-    } catch (e) {
-      return Container(
-        color: Colors.grey[100],
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.image_not_supported,
-                  size: 40, color: Colors.grey[400]),
-              const SizedBox(height: 4),
-              Text(
-                'Image non disponible',
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+    final imageUrl = _proxiedUrl(url);
+    return Image.network(
+      imageUrl,
+      fit: fit,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Container(
+          color: Colors.grey[100],
+          child: const Center(
+            child: SizedBox(
+              width: 24, height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) =>
+          errorBuilder?.call(context) ??
+          Container(
+            color: Colors.grey[200],
+            child: const Icon(Icons.image_not_supported, size: 40, color: Colors.grey),
+          ),
+    );
+  }
+
+  Widget _buildSortChip({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final color = selected ? Theme.of(context).colorScheme.primary : Colors.grey.shade200;
+    final textColor = selected ? Colors.white : Colors.grey.shade700;
+    final iconColor = selected ? Colors.white : Colors.grey.shade600;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: iconColor),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                color: textColor,
               ),
-            ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Badge coloré de catégorie produit
+  Widget _buildCategoryBadge(String? categorie) {
+    if (categorie == null || categorie.isEmpty) return const SizedBox.shrink();
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        categorie.length > 30 ? '${categorie.substring(0, 28)}…' : categorie,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: colorScheme.onPrimaryContainer,
+        ),
+      ),
+    );
+  }
+
+  /// Carte de rappel avec animation staggerée
+  Widget _buildRappelCard(dynamic rappel, int index) {
+    final title = rappel['libelle'] ?? rappel['libelle_produit'] ?? 'Produit sans nom';
+    final brand = rappel['marque_produit'] ?? rappel['nom_marque'] ?? 'Marque inconnue';
+    final categorie = rappel['categorie_produit']?.toString();
+    final imageUrl = _extractFirstImageUrl(rappel);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    String date = 'Date inconnue';
+    if (rappel['date_publication'] != null) {
+      try {
+        final parsedDate = _parseDate(rappel['date_publication']);
+        if (parsedDate != null) {
+          date = DateFormat('dd/MM/yyyy').format(parsedDate);
+        } else if (rappel['date_publication'].toString().contains('/')) {
+          date = rappel['date_publication'];
+        }
+      } catch (_) {
+        date = rappel['date_publication'] ?? 'Date inconnue';
+      }
+    }
+
+    // Animation staggerée : chaque carte apparaît avec un délai progressif
+    final delay = (index * 0.06).clamp(0.0, 0.8);
+    final slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.12),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _staggerController,
+      curve: Interval(delay, (delay + 0.4).clamp(0.0, 1.0), curve: Curves.easeOut),
+    ));
+    final fadeAnim = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
+      parent: _staggerController,
+      curve: Interval(delay, (delay + 0.4).clamp(0.0, 1.0), curve: Curves.easeOut),
+    ));
+
+    return FadeTransition(
+      opacity: fadeAnim,
+      child: SlideTransition(
+        position: slideAnim,
+        child: Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: InkWell(
+            onTap: () => _openProductDetails(rappel),
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Image 90x90
+                  Container(
+                    width: 90,
+                    height: 90,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: colorScheme.surfaceContainerHighest,
+                    ),
+                    child: imageUrl != null
+                        ? _buildNetworkImageWithFallback(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (ctx) => Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 36,
+                              color: colorScheme.outline,
+                            ),
+                          )
+                        : Icon(
+                            Icons.warning_amber_rounded,
+                            size: 36,
+                            color: colorScheme.primary,
+                          ),
+                  ),
+                  const SizedBox(width: 14),
+                  // Texte
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (categorie != null) ...[
+                          _buildCategoryBadge(categorie),
+                          const SizedBox(height: 6),
+                        ],
+                        Text(
+                          title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          brand,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.calendar_today_outlined,
+                                size: 11, color: colorScheme.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              date,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: colorScheme.outline),
+                ],
+              ),
+            ),
           ),
         ),
-      );
-    }
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final int currentYear = DateTime.now().year;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.categoryTitle),
-        elevation: 2,
         actions: const [AppMenu()],
       ),
       body: Column(
         children: [
+          // Barre de recherche unifiée
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      hintText: 'Rechercher un produit...',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: SearchBar(
+              controller: _searchController,
+              hintText: 'Rechercher un produit...',
+              leading: const Icon(Icons.search),
+              trailing: [
+                if (_searchQuery.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                      _fetchRappels();
                     },
-                    onSubmitted: (_) => _searchRappels(),
                   ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
+                FilledButton(
                   onPressed: _searchRappels,
-                  child: const Text('Rechercher'),
+                  child: const Text('OK'),
                 ),
               ],
+              onChanged: (value) => setState(() => _searchQuery = value),
+              onSubmitted: (_) => _searchRappels(),
             ),
           ),
-          // Plus de bouton ou switch de filtre d'année ici
+
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                // Shimmer pendant le chargement
+                ? ListView.builder(
+                    itemCount: 6,
+                    itemBuilder: (_, __) => const RappelCardShimmer(),
+                  )
                 : _errorMessage != null
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.error_outline,
-                                color: Colors.red, size: 48),
-                            const SizedBox(height: 16),
-                            Text(_errorMessage!,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 16)),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _fetchRappels,
-                              child: const Text('Réessayer'),
-                            ),
-                          ],
-                        ),
-                      )
+                    ? _buildErrorState()
                     : _filteredRappels.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.info_outline,
-                                    color: Colors.blue, size: 48),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Aucun rappel trouvé pour l\'année $currentYear dans la catégorie "${widget.categoryTitle}"',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: _fetchRappels,
-                                  child: const Text('Rafraîchir'),
-                                ),
-                              ],
-                            ),
-                          )
+                        ? _buildEmptyState()
                         : Column(
                             children: [
+                              // Compteur + tri
                               Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 16.0),
+                                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                                 child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
-                                      '${_filteredRappels.length} résultats trouvés',
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                    ElevatedButton.icon(
-                                      onPressed: _toggleSortOrder,
-                                      icon: Icon(_isNewestFirst
-                                          ? Icons.arrow_downward
-                                          : Icons.arrow_upward),
-                                      label: Text(_isNewestFirst
-                                          ? 'Plus récent'
-                                          : 'Plus ancien'),
-                                      style: ElevatedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12),
+                                      '${_filteredRappels.length} résultats',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                        color: colorScheme.onSurfaceVariant,
                                       ),
+                                    ),
+                                    Row(
+                                      children: [
+                                        _buildSortChip(
+                                          label: 'Récent',
+                                          icon: Icons.arrow_downward,
+                                          selected: _isNewestFirst,
+                                          onTap: () { if (!_isNewestFirst) _toggleSortOrder(); },
+                                        ),
+                                        const SizedBox(width: 6),
+                                        _buildSortChip(
+                                          label: 'Ancien',
+                                          icon: Icons.arrow_upward,
+                                          selected: !_isNewestFirst,
+                                          onTap: () { if (_isNewestFirst) _toggleSortOrder(); },
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
                               ),
+                              // Liste avec stagger
                               Expanded(
                                 child: ListView.builder(
                                   itemCount: _paginatedRappels.length,
-                                  itemBuilder: (context, index) {
-                                    final rappel = _paginatedRappels[index];
-                                    final title = rappel['libelle'] ??
-                                        rappel['libelle_produit'] ??
-                                        'Produit sans nom';
-                                    final brand = rappel['marque_produit'] ??
-                                        rappel['nom_marque'] ??
-                                        'Marque inconnue';
-
-                                    String date = 'Date inconnue';
-                                    if (rappel['date_publication'] != null) {
-                                      try {
-                                        final parsedDate = _parseDate(
-                                            rappel['date_publication']);
-                                        if (parsedDate != null) {
-                                          date = DateFormat('dd/MM/yyyy')
-                                              .format(parsedDate);
-                                        } else if (rappel['date_publication']
-                                            .toString()
-                                            .contains('/')) {
-                                          date = rappel['date_publication'];
-                                        }
-                                      } catch (e) {
-                                        date = rappel['date_publication'] ??
-                                            'Date inconnue';
-                                      }
-                                    }
-
-                                    final imageUrl =
-                                        _extractFirstImageUrl(rappel);
-
-                                    return Card(
-                                      margin: const EdgeInsets.symmetric(
-                                          horizontal: 16.0, vertical: 8.0),
-                                      child: InkWell(
-                                        onTap: () =>
-                                            _openProductDetails(rappel),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(16.0),
-                                          child: Row(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Container(
-                                                width: 80,
-                                                height: 80,
-                                                decoration: BoxDecoration(
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                ),
-                                                clipBehavior: Clip.antiAlias,
-                                                child: imageUrl != null
-                                                    ? _buildNetworkImageWithFallback(
-                                                        imageUrl,
-                                                        fit: BoxFit.cover,
-                                                        errorBuilder:
-                                                            (context) =>
-                                                                Container(
-                                                          color:
-                                                              Colors.grey[200],
-                                                          child: const Icon(
-                                                              Icons
-                                                                  .image_not_supported,
-                                                              size: 40,
-                                                              color:
-                                                                  Colors.grey),
-                                                        ),
-                                                      )
-                                                    : Container(
-                                                        color: Colors.grey[200],
-                                                        child: const Icon(
-                                                            Icons
-                                                                .image_not_supported,
-                                                            size: 40,
-                                                            color: Colors.grey),
-                                                      ),
-                                              ),
-                                              const SizedBox(width: 16),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(title,
-                                                        style: const TextStyle(
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                            fontSize: 16)),
-                                                    const SizedBox(height: 8),
-                                                    Text('Marque: $brand'),
-                                                    const SizedBox(height: 4),
-                                                    Text('Publié le: $date'),
-                                                  ],
-                                                ),
-                                              ),
-                                              const Icon(Icons.chevron_right),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
+                                  itemBuilder: (context, index) =>
+                                      _buildRappelCard(_paginatedRappels[index], index),
                                 ),
                               ),
+                              // Pagination
                               if (_filteredRappels.length > _pageSize)
                                 Padding(
-                                  padding: const EdgeInsets.all(16.0),
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      IconButton(
+                                      IconButton.outlined(
                                         icon: const Icon(Icons.chevron_left),
                                         onPressed: _currentPage > 0
-                                            ? () =>
-                                                setState(() => _currentPage--)
+                                            ? () => setState(() { _currentPage--; _staggerController.forward(from: 0); })
                                             : null,
                                       ),
-                                      Text(
-                                        'Page ${_currentPage + 1} / ${(_filteredRappels.length / _pageSize).ceil()}',
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                                        child: Text(
+                                          'Page ${_currentPage + 1} / ${(_filteredRappels.length / _pageSize).ceil()}',
+                                          style: const TextStyle(fontWeight: FontWeight.w600),
+                                        ),
                                       ),
-                                      IconButton(
+                                      IconButton.outlined(
                                         icon: const Icon(Icons.chevron_right),
-                                        onPressed: (_currentPage + 1) *
-                                                    _pageSize <
-                                                _filteredRappels.length
-                                            ? () =>
-                                                setState(() => _currentPage++)
+                                        onPressed: (_currentPage + 1) * _pageSize < _filteredRappels.length
+                                            ? () => setState(() { _currentPage++; _staggerController.forward(from: 0); })
                                             : null,
                                       ),
                                     ],
@@ -563,10 +636,89 @@ class _RappelListScreenState extends State<RappelListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: _fetchRappels,
-        tooltip: 'Rafraîchir',
-        child: const Icon(Icons.refresh),
+        icon: const Icon(Icons.refresh),
+        label: const Text('Actualiser'),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: colorScheme.errorContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.wifi_off_rounded, size: 48, color: colorScheme.onErrorContainer),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Impossible de charger les données',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: colorScheme.onSurface),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage!,
+              style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: _fetchRappels,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Réessayer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.search_off_rounded, size: 48, color: colorScheme.onPrimaryContainer),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Aucun rappel trouvé',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: colorScheme.onSurface),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'dans la catégorie "${widget.categoryTitle}"',
+              style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: _fetchRappels,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Rafraîchir'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -574,6 +726,7 @@ class _RappelListScreenState extends State<RappelListScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _staggerController.dispose();
     super.dispose();
   }
 }
