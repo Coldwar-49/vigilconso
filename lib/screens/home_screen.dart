@@ -235,10 +235,50 @@ class _HomeScreenState extends State<HomeScreen> {
     return 'https://wsrv.nl/?url=$encoded&output=jpg&q=85';
   }
 
+  /// Placeholder élégant : icône de catégorie sur fond dégradé
+  Widget _categoryPlaceholder(String? categorie, ColorScheme cs) {
+    final cat = (categorie ?? '').toLowerCase();
+    IconData icon;
+    if (cat.contains('vêtement') || cat.contains('mode') || cat.contains('habillement') || cat.contains('epi')) {
+      icon = Icons.checkroom_outlined;
+    } else if (cat.contains('aliment') || cat.contains('denrée') || cat.contains('boisson') || cat.contains('épicerie') || cat.contains('viande') || cat.contains('poisson')) {
+      icon = Icons.lunch_dining_outlined;
+    } else if (cat.contains('automobile') || cat.contains('véhicule') || cat.contains('transport') || cat.contains('moto')) {
+      icon = Icons.directions_car_outlined;
+    } else if (cat.contains('électrique') || cat.contains('électronique') || cat.contains('appareil') || cat.contains('outil')) {
+      icon = Icons.electrical_services_outlined;
+    } else if (cat.contains('jouet') || cat.contains('enfant') || cat.contains('bébé') || cat.contains('puéricult')) {
+      icon = Icons.toys_outlined;
+    } else if (cat.contains('cosmétique') || cat.contains('hygiène') || cat.contains('beauté') || cat.contains('soin')) {
+      icon = Icons.face_retouching_natural_outlined;
+    } else if (cat.contains('médicament') || cat.contains('santé') || cat.contains('pharma')) {
+      icon = Icons.medication_outlined;
+    } else if (cat.contains('jardin') || cat.contains('bricolage')) {
+      icon = Icons.handyman_outlined;
+    } else if (cat.contains('animal') || cat.contains('animaux')) {
+      icon = Icons.pets_outlined;
+    } else {
+      icon = Icons.inventory_2_outlined;
+    }
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [cs.primaryContainer, cs.secondaryContainer],
+        ),
+      ),
+      child: Center(
+        child: Icon(icon, size: 28, color: cs.primary.withOpacity(0.75)),
+      ),
+    );
+  }
+
   Widget _buildLatestRappelCard(dynamic rappel, BuildContext context) {
     final title = rappel['libelle'] ?? rappel['libelle_produit'] ?? 'Produit sans nom';
     final brand = rappel['marque_produit'] ?? rappel['nom_marque'] ?? '';
     final dateStr = rappel['date_publication'] ?? '';
+    final categorie = rappel['categorie_de_produit'] as String?;
     final colorScheme = Theme.of(context).colorScheme;
     String formattedDate = '';
     bool isNew = false;
@@ -278,9 +318,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (loadingProgress == null) return child;
                         return Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary)));
                       },
-                      errorBuilder: (_, __, ___) => Icon(Icons.warning_amber_rounded, color: colorScheme.primary, size: 28),
+                      errorBuilder: (_, __, ___) => _categoryPlaceholder(categorie, colorScheme),
                     )
-                  : Icon(Icons.warning_amber_rounded, color: colorScheme.primary, size: 28),
+                  : _categoryPlaceholder(categorie, colorScheme),
             ),
             const SizedBox(width: 14),
             Expanded(

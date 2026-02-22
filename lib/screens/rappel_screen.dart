@@ -289,6 +289,49 @@ class _RappelListScreenState extends State<RappelListScreen>
     return 'https://wsrv.nl/?url=$encoded&output=jpg&q=85';
   }
 
+  /// Placeholder élégant quand aucune image n'est disponible :
+  /// icône de catégorie sur fond dégradé coloré.
+  Widget _categoryPlaceholder(String? categorie, ColorScheme cs) {
+    final cat = (categorie ?? '').toLowerCase();
+    IconData icon;
+    if (cat.contains('vêtement') || cat.contains('mode') || cat.contains('habillement') || cat.contains('epi')) {
+      icon = Icons.checkroom_outlined;
+    } else if (cat.contains('aliment') || cat.contains('denrée') || cat.contains('boisson') || cat.contains('épicerie')) {
+      icon = Icons.lunch_dining_outlined;
+    } else if (cat.contains('automobile') || cat.contains('véhicule') || cat.contains('transport') || cat.contains('moto')) {
+      icon = Icons.directions_car_outlined;
+    } else if (cat.contains('électrique') || cat.contains('électronique') || cat.contains('appareil') || cat.contains('outil')) {
+      icon = Icons.electrical_services_outlined;
+    } else if (cat.contains('jouet') || cat.contains('enfant') || cat.contains('bébé') || cat.contains('puéricult')) {
+      icon = Icons.toys_outlined;
+    } else if (cat.contains('cosmétique') || cat.contains('hygiène') || cat.contains('beauté') || cat.contains('soin')) {
+      icon = Icons.face_retouching_natural_outlined;
+    } else if (cat.contains('médicament') || cat.contains('santé') || cat.contains('pharma')) {
+      icon = Icons.medication_outlined;
+    } else if (cat.contains('jardin') || cat.contains('bricolage')) {
+      icon = Icons.handyman_outlined;
+    } else if (cat.contains('animal') || cat.contains('animaux')) {
+      icon = Icons.pets_outlined;
+    } else if (cat.contains('alimentaire') || cat.contains('viande') || cat.contains('poisson')) {
+      icon = Icons.set_meal_outlined;
+    } else {
+      icon = Icons.inventory_2_outlined;
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [cs.primaryContainer, cs.secondaryContainer],
+        ),
+      ),
+      child: Center(
+        child: Icon(icon, size: 38, color: cs.primary.withOpacity(0.75)),
+      ),
+    );
+  }
+
   Widget _buildNetworkImageWithFallback(
     String url, {
     BoxFit fit = BoxFit.cover,
@@ -440,17 +483,10 @@ class _RappelListScreenState extends State<RappelListScreen>
                         ? _buildNetworkImageWithFallback(
                             imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (ctx) => Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 36,
-                              color: colorScheme.outline,
-                            ),
+                            errorBuilder: (ctx) =>
+                                _categoryPlaceholder(categorie, colorScheme),
                           )
-                        : Icon(
-                            Icons.warning_amber_rounded,
-                            size: 36,
-                            color: colorScheme.primary,
-                          ),
+                        : _categoryPlaceholder(categorie, colorScheme),
                   ),
                   const SizedBox(width: 14),
                   // Texte

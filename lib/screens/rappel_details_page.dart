@@ -359,6 +359,21 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
   }
 
   Widget _buildRiskSection() {
+    // Découpe par | ou , pour gérer les valeurs multiples de l'API
+    final rawRisques = widget.rappel['risques_encourus'];
+    List<String> risques = [];
+    if (rawRisques is String && rawRisques.trim().isNotEmpty) {
+      risques = rawRisques
+          .split(RegExp(r'[|,]'))
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    } else if (rawRisques is List) {
+      risques = rawRisques.whereType<String>().map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    }
+
+    final descComp = (widget.rappel['description_complementaire_risque'] ?? '').toString().trim();
+
     return Card(
       color: Colors.orange[50],
       elevation: 4,
@@ -370,7 +385,7 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
           children: [
             const Row(
               children: [
-                Icon(Icons.warning, color: Colors.red),
+                Icon(Icons.warning_amber_rounded, color: Colors.red),
                 SizedBox(width: 8),
                 Text(
                   'Risque identifié',
@@ -382,17 +397,28 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Text(
-              widget.rappel['risques_encourus'] ?? 'Information non disponible',
-              style: const TextStyle(fontSize: 16),
-            ),
-            if ((widget.rappel['description_complementaire_risque'] ?? '')
-                .isNotEmpty)
+            const SizedBox(height: 12),
+            if (risques.isEmpty)
+              const Text('Information non disponible',
+                  style: TextStyle(fontSize: 15, color: Colors.grey))
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: risques.map((r) => Chip(
+                  label: Text(
+                    _capitalize(r),
+                    style: const TextStyle(fontSize: 13, color: Colors.red, fontWeight: FontWeight.w600),
+                  ),
+                  backgroundColor: Colors.red[50],
+                  side: BorderSide(color: Colors.red.shade200),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                )).toList(),
+              ),
+            if (descComp.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                    widget.rappel['description_complementaire_risque'] ?? ''),
+                padding: const EdgeInsets.only(top: 12.0),
+                child: Text(descComp, style: const TextStyle(fontSize: 15, height: 1.5)),
               ),
           ],
         ),
@@ -400,23 +426,23 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
     );
   }
 
+  String _capitalize(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
   Widget _buildConsumerActions() {
     final dynamic actions = widget.rappel['conduites_a_tenir_par_le_consommateur'];
     List<String> actionsList;
 
     if (actions == null) {
-      actionsList = ['Information non disponible'];
+      actionsList = [];
     } else if (actions is String) {
       actionsList = actions.trim().isNotEmpty
-          ? actions.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
-          : ['Information non disponible'];
+          ? actions.split(RegExp(r'[|,]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+          : [];
     } else if (actions is List) {
-      actionsList = actions.whereType<String>().where((e) => e.trim().isNotEmpty).toList();
-      if (actionsList.isEmpty) {
-        actionsList = ['Information non disponible'];
-      }
+      actionsList = actions.whereType<String>().map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     } else {
-      actionsList = ['Information non disponible'];
+      actionsList = [];
     }
 
     return Card(
@@ -437,23 +463,28 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
               ),
             ),
             const SizedBox(height: 10),
-            ...actionsList.map(
-              (action) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.arrow_forward_ios,
-                      size: 14,
-                      color: Colors.red,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(action)),
-                  ],
+            if (actionsList.isEmpty)
+              const Text('Information non disponible',
+                  style: TextStyle(fontSize: 15, color: Colors.grey))
+            else
+              ...actionsList.map(
+                (action) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5.0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.red),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _capitalize(action),
+                          style: const TextStyle(fontSize: 15, height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
