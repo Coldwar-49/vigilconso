@@ -217,8 +217,8 @@ class _HomeScreenState extends State<HomeScreen> {
           LayoutBuilder(
             builder: (context, constraints) {
               final cardWidth = constraints.maxWidth * 0.50;
-              final imageHeight = cardWidth / 1.32;
-              final cardHeight = imageHeight + 95;
+              final imageHeight = cardWidth / 2.64;
+              final cardHeight = imageHeight + 80;
               if (_isLoadingLatest) {
                 return SizedBox(
                   height: cardHeight,
@@ -345,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Image responsive (s'adapte à la largeur de la carte)
           Stack(children: [
             AspectRatio(
-              aspectRatio: 1.32,
+              aspectRatio: 2.64,
               child: rawImageUrl != null
                   ? Image.network(
                       _proxiedUrl(rawImageUrl),
