@@ -450,7 +450,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ]),
           // Description centrée
           Expanded(
-            child: Padding(
+            child: ClipRect(
+              child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -458,8 +459,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, height: 1.35),
-                    maxLines: 3,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, height: 1.3),
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                   ),
@@ -483,6 +484,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ],
               ),
+            ),
             ),
           ),
         ]),

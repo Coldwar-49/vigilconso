@@ -105,10 +105,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             )),
           ]),
           Expanded(
-            child: Padding(
+            child: ClipRect(
+              child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.center, children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, height: 1.3), maxLines: 3, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, height: 1.3), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
                 if (brand.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(brand, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
@@ -122,6 +123,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   ]),
                 ],
               ]),
+            ),
             ),
           ),
         ]),
