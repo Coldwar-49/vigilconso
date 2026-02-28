@@ -266,7 +266,7 @@ class _RappelListScreenState extends State<RappelListScreen>
     if (imagesData == null) return null;
 
     if (imagesData is String && imagesData.isNotEmpty) {
-      final rawUrls = imagesData.split(RegExp(r'[,;\s]+'));
+      final rawUrls = imagesData.split(RegExp(r'[,;|\s]+'));
       for (var url in rawUrls) {
         final trimmed = url.trim().replaceAll('"', '').replaceAll("'", "");
         if (trimmed.startsWith('http')) return trimmed;

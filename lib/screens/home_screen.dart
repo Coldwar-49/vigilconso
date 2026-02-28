@@ -260,7 +260,7 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Extrait la première URL d'image valide depuis le champ liens_vers_les_images
   String? _extractFirstImageUrl(dynamic imagesData) {
     if (imagesData is String && imagesData.isNotEmpty) {
-      final parts = imagesData.split(RegExp(r'[,;\s]+'));
+      final parts = imagesData.split(RegExp(r'[,;|\s]+'));
       for (final part in parts) {
         final trimmed = part.trim();
         if (trimmed.startsWith('http')) return trimmed;

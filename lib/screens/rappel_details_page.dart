@@ -96,7 +96,7 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
     final List<String> imageUrls = [];
 
     if (imagesData is String && imagesData.isNotEmpty) {
-      final rawUrls = imagesData.split(RegExp(r'[,;\s]+'));
+      final rawUrls = imagesData.split(RegExp(r'[,;|\s]+'));
       for (var url in rawUrls) {
         final trimmedUrl = url.trim();
         if (trimmedUrl.startsWith('http')) {
