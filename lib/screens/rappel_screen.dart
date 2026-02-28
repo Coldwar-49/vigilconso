@@ -9,11 +9,13 @@ import 'package:vigiconso/widgets/app_menu.dart';
 class RappelListScreen extends StatefulWidget {
   final String categoryKey;
   final String categoryTitle;
+  final String initialSearch;
 
   const RappelListScreen({
     super.key,
     required this.categoryKey,
     required this.categoryTitle,
+    this.initialSearch = '',
   });
 
   @override
@@ -42,7 +44,13 @@ class _RappelListScreenState extends State<RappelListScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    _fetchRappels();
+    if (widget.initialSearch.isNotEmpty) {
+      _searchQuery = widget.initialSearch;
+      _searchController.text = widget.initialSearch;
+      _searchRappels();
+    } else {
+      _fetchRappels();
+    }
   }
 
   DateTime? _parseDate(String dateStr) {

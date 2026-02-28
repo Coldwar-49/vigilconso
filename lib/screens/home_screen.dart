@@ -28,6 +28,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _newAlertsCount = 0;
   bool _notificationsEnabled = false;
   bool _isTogglingNotification = false;
+  final TextEditingController _searchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -111,7 +113,24 @@ class _HomeScreenState extends State<HomeScreen> {
     _autoScrollTimer?.cancel();
     _alertPageController.dispose();
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  void _submitSearch(String query) {
+    final q = query.trim();
+    if (q.isEmpty) return;
+    _searchController.clear();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RappelListScreen(
+          categoryKey: 'all',
+          categoryTitle: 'Résultats : "$q"',
+          initialSearch: q,
+        ),
+      ),
+    );
   }
 
   void _scrollToTop() {
@@ -184,7 +203,28 @@ class _HomeScreenState extends State<HomeScreen> {
               ]),
               const SizedBox(height: 6),
               Text('Protegez-vous contre les produits rappeles', style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.9))),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+              // Barre de recherche rapide
+              TextField(
+                controller: _searchController,
+                onSubmitted: _submitSearch,
+                textInputAction: TextInputAction.search,
+                style: const TextStyle(fontSize: 15),
+                decoration: InputDecoration(
+                  hintText: 'Rechercher un produit, une marque...',
+                  hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                  suffixIcon: IconButton(
+                    icon: Icon(Icons.arrow_forward, color: Theme.of(context).colorScheme.primary),
+                    onPressed: () => _submitSearch(_searchController.text),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 12),
               Center(
                 child: Card(
                   elevation: 4,
