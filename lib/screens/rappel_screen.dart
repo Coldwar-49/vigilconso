@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:vigiconso/screens/rappel_details_page.dart';
 import 'package:vigiconso/utils/constants.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
-import 'package:vigiconso/widgets/shimmer_loading.dart';
 
 class RappelListScreen extends StatefulWidget {
   final String categoryKey;
@@ -400,150 +399,115 @@ class _RappelListScreenState extends State<RappelListScreen>
     );
   }
 
-  /// Badge coloré de catégorie produit
-  Widget _buildCategoryBadge(String? categorie) {
-    if (categorie == null || categorie.isEmpty) return const SizedBox.shrink();
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        categorie.length > 30 ? '${categorie.substring(0, 28)}…' : categorie,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: colorScheme.onPrimaryContainer,
-        ),
-      ),
-    );
-  }
 
-  /// Carte de rappel avec animation staggerée
+  /// Carte de rappel — grille 2 colonnes, image en haut, description centrée
   Widget _buildRappelCard(dynamic rappel, int index) {
     final title = rappel['libelle'] ?? rappel['libelle_produit'] ?? 'Produit sans nom';
-    final brand = rappel['marque_produit'] ?? rappel['nom_marque'] ?? 'Marque inconnue';
+    final brand = rappel['marque_produit'] ?? rappel['nom_marque'] ?? '';
     final categorie = rappel['categorie_produit']?.toString();
     final imageUrl = _extractFirstImageUrl(rappel);
-    final colorScheme = Theme.of(context).colorScheme;
-
-    String date = 'Date inconnue';
+    final cs = Theme.of(context).colorScheme;
+    bool isNew = false;
+    String date = '';
     if (rappel['date_publication'] != null) {
       try {
-        final parsedDate = _parseDate(rappel['date_publication']);
-        if (parsedDate != null) {
-          date = DateFormat('dd/MM/yyyy').format(parsedDate);
-        } else if (rappel['date_publication'].toString().contains('/')) {
-          date = rappel['date_publication'];
+        final parsed = _parseDate(rappel['date_publication']);
+        if (parsed != null) {
+          date = DateFormat('dd/MM/yyyy').format(parsed);
+          isNew = DateTime.now().difference(parsed).inDays <= 7;
         }
-      } catch (_) {
-        date = rappel['date_publication'] ?? 'Date inconnue';
-      }
+      } catch (_) {}
     }
 
-    // Animation staggerée : chaque carte apparaît avec un délai progressif
     final delay = (index * 0.06).clamp(0.0, 0.8);
-    final slideAnim = Tween<Offset>(
-      begin: const Offset(0, 0.12),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _staggerController,
-      curve: Interval(delay, (delay + 0.4).clamp(0.0, 1.0), curve: Curves.easeOut),
-    ));
-    final fadeAnim = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
-      parent: _staggerController,
-      curve: Interval(delay, (delay + 0.4).clamp(0.0, 1.0), curve: Curves.easeOut),
-    ));
+    final slideAnim = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _staggerController, curve: Interval(delay, (delay + 0.4).clamp(0.0, 1.0), curve: Curves.easeOut)));
+    final fadeAnim = Tween<double>(begin: 0, end: 1)
+        .animate(CurvedAnimation(parent: _staggerController, curve: Interval(delay, (delay + 0.4).clamp(0.0, 1.0), curve: Curves.easeOut)));
 
     return FadeTransition(
       opacity: fadeAnim,
       child: SlideTransition(
         position: slideAnim,
         child: Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.hardEdge,
           child: InkWell(
             onTap: () => _openProductDetails(rappel),
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Image 90x90
-                  Container(
-                    width: 90,
-                    height: 90,
-                    clipBehavior: Clip.antiAlias,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: colorScheme.surfaceContainerHighest,
+            child: Column(children: [
+              // Image en haut
+              Stack(children: [
+                AspectRatio(
+                  aspectRatio: 2.64,
+                  child: imageUrl != null
+                      ? _buildNetworkImageWithFallback(imageUrl, fit: BoxFit.cover,
+                          errorBuilder: (ctx) => _categoryPlaceholder(categorie, cs))
+                      : _categoryPlaceholder(categorie, cs),
+                ),
+                if (isNew)
+                  Positioned(
+                    top: 6, right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(color: cs.primary, borderRadius: BorderRadius.circular(6)),
+                      child: Text('NOUVEAU', style: TextStyle(color: cs.onPrimary, fontSize: 9, fontWeight: FontWeight.bold)),
                     ),
-                    child: imageUrl != null
-                        ? _buildNetworkImageWithFallback(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (ctx) =>
-                                _categoryPlaceholder(categorie, colorScheme),
-                          )
-                        : _categoryPlaceholder(categorie, colorScheme),
                   ),
-                  const SizedBox(width: 14),
-                  // Texte
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (categorie != null) ...[
-                          _buildCategoryBadge(categorie),
-                          const SizedBox(height: 6),
-                        ],
-                        Text(
-                          title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            height: 1.3,
-                          ),
-                        ),
+              ]),
+              // Description centrée
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(title,
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, height: 1.3),
+                        maxLines: 3, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+                      if (brand.isNotEmpty) ...[
                         const SizedBox(height: 4),
-                        Text(
-                          brand,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(Icons.calendar_today_outlined,
-                                size: 11, color: colorScheme.primary),
-                            const SizedBox(width: 4),
-                            Text(
-                              date,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: colorScheme.primary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
+                        Text(brand, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11),
+                          maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
                       ],
-                    ),
+                      if (date.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          Icon(Icons.calendar_today_outlined, size: 11, color: cs.primary),
+                          const SizedBox(width: 3),
+                          Text(date, style: TextStyle(color: cs.primary, fontSize: 11, fontWeight: FontWeight.w500)),
+                        ]),
+                      ],
+                    ],
                   ),
-                  Icon(Icons.chevron_right, color: colorScheme.outline),
-                ],
+                ),
               ),
-            ),
+            ]),
           ),
         ),
       ),
     );
+  }
+
+  /// Shimmer pour la grille pendant le chargement
+  Widget _buildGridShimmer(double ratio) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final cs = Theme.of(context).colorScheme;
+      return Card(
+        margin: EdgeInsets.zero,
+        child: Column(children: [
+          AspectRatio(aspectRatio: 2.64, child: Container(color: cs.primaryContainer.withOpacity(0.4))),
+          Expanded(child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Container(height: 12, width: double.infinity, decoration: BoxDecoration(color: cs.primaryContainer.withOpacity(0.4), borderRadius: BorderRadius.circular(6))),
+              const SizedBox(height: 6),
+              Container(height: 10, width: 80, decoration: BoxDecoration(color: cs.primaryContainer.withOpacity(0.4), borderRadius: BorderRadius.circular(6))),
+            ]),
+          )),
+        ]),
+      );
+    });
   }
 
   @override
@@ -586,11 +550,17 @@ class _RappelListScreenState extends State<RappelListScreen>
 
           Expanded(
             child: _isLoading
-                // Shimmer pendant le chargement
-                ? ListView.builder(
-                    itemCount: 6,
-                    itemBuilder: (_, __) => const RappelCardShimmer(),
-                  )
+                ? LayoutBuilder(builder: (context, constraints) {
+                    final cardWidth = (constraints.maxWidth - 32 - 10) / 2;
+                    final ratio = cardWidth / (cardWidth / 2.64 + 90);
+                    return GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: ratio),
+                      itemCount: 6,
+                      itemBuilder: (_, __) => _buildGridShimmer(ratio),
+                    );
+                  })
                 : _errorMessage != null
                     ? _buildErrorState()
                     : _filteredRappels.isEmpty
@@ -605,39 +575,29 @@ class _RappelListScreenState extends State<RappelListScreen>
                                   children: [
                                     Text(
                                       '${_filteredRappels.length} résultats',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
+                                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: colorScheme.onSurfaceVariant),
                                     ),
-                                    Row(
-                                      children: [
-                                        _buildSortChip(
-                                          label: 'Récent',
-                                          icon: Icons.arrow_downward,
-                                          selected: _isNewestFirst,
-                                          onTap: () { if (!_isNewestFirst) _toggleSortOrder(); },
-                                        ),
-                                        const SizedBox(width: 6),
-                                        _buildSortChip(
-                                          label: 'Ancien',
-                                          icon: Icons.arrow_upward,
-                                          selected: !_isNewestFirst,
-                                          onTap: () { if (_isNewestFirst) _toggleSortOrder(); },
-                                        ),
-                                      ],
-                                    ),
+                                    Row(children: [
+                                      _buildSortChip(label: 'Récent', icon: Icons.arrow_downward, selected: _isNewestFirst, onTap: () { if (!_isNewestFirst) _toggleSortOrder(); }),
+                                      const SizedBox(width: 6),
+                                      _buildSortChip(label: 'Ancien', icon: Icons.arrow_upward, selected: !_isNewestFirst, onTap: () { if (_isNewestFirst) _toggleSortOrder(); }),
+                                    ]),
                                   ],
                                 ),
                               ),
-                              // Liste avec stagger
+                              // Grille 2 colonnes avec stagger
                               Expanded(
-                                child: ListView.builder(
-                                  itemCount: _paginatedRappels.length,
-                                  itemBuilder: (context, index) =>
-                                      _buildRappelCard(_paginatedRappels[index], index),
-                                ),
+                                child: LayoutBuilder(builder: (context, constraints) {
+                                  final cardWidth = (constraints.maxWidth - 32 - 10) / 2;
+                                  final ratio = cardWidth / (cardWidth / 2.64 + 90);
+                                  return GridView.builder(
+                                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: ratio),
+                                    itemCount: _paginatedRappels.length,
+                                    itemBuilder: (_, i) => _buildRappelCard(_paginatedRappels[i], i),
+                                  );
+                                }),
                               ),
                               // Pagination
                               if (_filteredRappels.length > _pageSize)
@@ -654,10 +614,8 @@ class _RappelListScreenState extends State<RappelListScreen>
                                       ),
                                       Padding(
                                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                                        child: Text(
-                                          'Page ${_currentPage + 1} / ${(_filteredRappels.length / _pageSize).ceil()}',
-                                          style: const TextStyle(fontWeight: FontWeight.w600),
-                                        ),
+                                        child: Text('Page ${_currentPage + 1} / ${(_filteredRappels.length / _pageSize).ceil()}',
+                                          style: const TextStyle(fontWeight: FontWeight.w600)),
                                       ),
                                       IconButton.outlined(
                                         icon: const Icon(Icons.chevron_right),
