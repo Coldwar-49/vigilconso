@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vigiconso/screens/main_screen.dart';
 import 'package:vigiconso/services/subscribe_to_newsletter.dart' show NotificationService;
 
@@ -9,6 +10,14 @@ void main() async {
 
   // Sur mobile : initialise OneSignal. Sur web : ne fait rien.
   NotificationService.initialize(_oneSignalAppId);
+
+  // Au 1er lancement : demande automatiquement la permission de notifications
+  final prefs = await SharedPreferences.getInstance();
+  final alreadyRequested = prefs.getBool('notifications_requested') ?? false;
+  if (!alreadyRequested) {
+    await NotificationService.subscribe();
+    await prefs.setBool('notifications_requested', true);
+  }
 
   runApp(const RappelConsoApp());
 }
