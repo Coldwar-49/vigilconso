@@ -41,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadLatestRappels({bool forceRefresh = false}) async {
     setState(() { _isLoadingLatest = true; _latestError = null; });
     try {
-      final results = await RappelService.fetchLatestRappels(limit: 4);
+      final results = await RappelService.fetchLatestRappels(limit: 5);
       if (mounted) setState(() { _latestRappels = results; _isLoadingLatest = false; });
     } catch (e) {
       if (mounted) setState(() { _isLoadingLatest = false; _latestError = 'Impossible de charger les alertes.'; });
@@ -193,22 +193,22 @@ class _HomeScreenState extends State<HomeScreen> {
         else
           LayoutBuilder(
             builder: (context, constraints) {
-              const spacing = 10.0;
-              const descHeight = 118.0;
-              final cardWidth = (constraints.maxWidth - spacing) / 2;
+              // Chaque carte occupe ~58% de l'écran → on voit qu'il y en a d'autres
+              final cardWidth = constraints.maxWidth * 0.58;
               final imageHeight = cardWidth / 1.1;
-              final ratio = cardWidth / (imageHeight + descHeight);
+              final cardHeight = imageHeight + 118;
               final items = _isLoadingLatest
-                  ? List.generate(4, (_) => const _AlertCardShimmer())
-                  : List.generate(_latestRappels.length, (i) => _buildLatestRappelCard(_latestRappels[i], context));
-              return GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: spacing,
-                mainAxisSpacing: spacing,
-                childAspectRatio: ratio,
-                children: items,
+                  ? List.generate(5, (_) => _AlertCardShimmer(width: cardWidth, height: cardHeight))
+                  : List.generate(_latestRappels.length, (i) => _buildLatestRappelCard(_latestRappels[i], context, cardWidth: cardWidth));
+              return SizedBox(
+                height: cardHeight,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.zero,
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (_, i) => SizedBox(width: cardWidth, child: items[i]),
+                ),
               );
             },
           ),
@@ -287,7 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildLatestRappelCard(dynamic rappel, BuildContext context) {
+  Widget _buildLatestRappelCard(dynamic rappel, BuildContext context, {double? cardWidth}) {
     final title = rappel['libelle'] ?? rappel['libelle_produit'] ?? 'Produit sans nom';
     final brand = rappel['marque_produit'] ?? rappel['nom_marque'] ?? '';
     final dateStr = rappel['date_publication'] ?? '';
@@ -545,9 +545,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// Shimmer placeholder pour une card de la grille d'alertes
+/// Shimmer placeholder pour une card du carousel d'alertes
 class _AlertCardShimmer extends StatefulWidget {
-  const _AlertCardShimmer();
+  final double? width;
+  final double? height;
+  const _AlertCardShimmer({this.width, this.height});
   @override
   State<_AlertCardShimmer> createState() => _AlertCardShimmerState();
 }
