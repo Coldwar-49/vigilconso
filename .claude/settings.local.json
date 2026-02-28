@@ -16,7 +16,15 @@
       "Bash(gh run view:*)",
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:coldwar-49.github.io)"
+      "WebFetch(domain:coldwar-49.github.io)",
+      "Bash(flutter pub get:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(git stash pop:*)",
+      "WebFetch(domain:data.economie.gouv.fr)",
+      "Bash(flutter build:*)",
+      "Bash(flutter doctor:*)"
     ]
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vigiconso/services/alerts_notifier.dart';
 import 'package:vigiconso/screens/barcode_scanner.dart';
 import 'package:vigiconso/screens/categories_screen.dart';
 import 'package:vigiconso/screens/rappel_screen.dart';
@@ -66,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         final newCount = await _countNewAlerts(results);
         await _saveLastSeenDate(results);
+        newAlertsNotifier.value = newCount;
         setState(() {
           _latestRappels = results;
           _newAlertsCount = newCount;

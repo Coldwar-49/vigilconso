@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
 import 'package:vigiconso/services/favorites_service.dart';
 
@@ -53,6 +55,34 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
     }
   }
 
+  void _shareRappel() {
+    final title = widget.rappel['libelle'] ?? 'Produit rappelé';
+    final brand = widget.rappel['marque_produit'] ?? widget.rappel['nom_marque'] ?? '';
+    final ref = widget.rappel['reference_fiche'] ?? '';
+    final rawRisques = widget.rappel['risques_encourus'];
+    String risques = '';
+    if (rawRisques is String) risques = rawRisques.split(RegExp(r'[|,]')).first.trim();
+
+    final buffer = StringBuffer();
+    buffer.writeln('🚨 Rappel produit : $title');
+    if (brand.isNotEmpty) buffer.writeln('Marque : $brand');
+    if (risques.isNotEmpty) buffer.writeln('Risque : $risques');
+    if (ref.isNotEmpty) buffer.writeln('\nFiche officielle :');
+    if (ref.isNotEmpty) buffer.writeln('https://rappel.conso.gouv.fr/fiche-rappel/$ref');
+    buffer.writeln('\nVia VigilConso');
+
+    Share.share(buffer.toString(), subject: title);
+  }
+
+  Future<void> _openOfficialPage() async {
+    final ref = widget.rappel['reference_fiche'] ?? '';
+    if (ref.isEmpty) return;
+    final uri = Uri.parse('https://rappel.conso.gouv.fr/fiche-rappel/$ref');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<String> imageUrls = _extractImageUrls();
@@ -64,6 +94,11 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
               title: Text(widget.rappel['libelle'] ?? 'Détails du rappel'),
               centerTitle: true,
               actions: [
+                IconButton(
+                  icon: const Icon(Icons.share_outlined),
+                  tooltip: 'Partager',
+                  onPressed: _shareRappel,
+                ),
                 IconButton(
                   icon: Icon(
                     _isFavorite ? Icons.favorite : Icons.favorite_border,
@@ -500,6 +535,7 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
   }
 
   Widget _buildContactInfo() {
+    final ref = widget.rappel['reference_fiche'] ?? '';
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -514,12 +550,20 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
             ),
             const Divider(),
             _buildInfoRow('Contact', widget.rappel['numero_contact']),
-            _buildInfoRow(
-                'Compensation', widget.rappel['modalites_de_compensation']),
-            _buildInfoRow(
-              'Date limite de rappel',
-              widget.rappel['date_de_fin_de_la_procedure_de_rappel'],
-            ),
+            _buildInfoRow('Compensation', widget.rappel['modalites_de_compensation']),
+            _buildInfoRow('Date limite de rappel', widget.rappel['date_de_fin_de_la_procedure_de_rappel']),
+            if (ref.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.open_in_new, size: 18),
+                  label: const Text('Voir la fiche officielle'),
+                  onPressed: _openOfficialPage,
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                ),
+              ),
+            ],
           ],
         ),
       ),

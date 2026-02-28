@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vigiconso/screens/main_screen.dart';
+import 'package:vigiconso/screens/onboarding_screen.dart';
 import 'package:vigiconso/services/subscribe_to_newsletter.dart' show NotificationService;
 
 const String _oneSignalAppId = 'eb3fd80e-1a70-468f-ab2e-e1d2eb9592ab';
@@ -11,19 +12,24 @@ void main() async {
   // Sur mobile : initialise OneSignal. Sur web : ne fait rien.
   NotificationService.initialize(_oneSignalAppId);
 
-  // Au 1er lancement : demande automatiquement la permission de notifications
   final prefs = await SharedPreferences.getInstance();
+
+  // Au 1er lancement : demande automatiquement la permission de notifications
   final alreadyRequested = prefs.getBool('notifications_requested') ?? false;
   if (!alreadyRequested) {
     await NotificationService.subscribe();
     await prefs.setBool('notifications_requested', true);
   }
 
-  runApp(const RappelConsoApp());
+  // Détermine si l'onboarding a déjà été affiché
+  final onboardingShown = prefs.getBool('onboarding_shown') ?? false;
+
+  runApp(RappelConsoApp(showOnboarding: !onboardingShown));
 }
 
 class RappelConsoApp extends StatelessWidget {
-  const RappelConsoApp({super.key});
+  final bool showOnboarding;
+  const RappelConsoApp({super.key, this.showOnboarding = false});
 
   // Couleur primaire : rouge sécurité, identitaire pour une app d'alertes
   static const Color _brandRed = Color(0xFFCC1421);
@@ -94,7 +100,7 @@ class RappelConsoApp extends StatelessWidget {
         ),
       ),
 
-      home: const MainScreen(),
+      home: showOnboarding ? const OnboardingScreen() : const MainScreen(),
     );
   }
 }
