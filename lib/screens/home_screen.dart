@@ -181,19 +181,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ]),
         const SizedBox(height: 12),
-        if (_isLoadingLatest)
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 0.72,
-            children: List.generate(4, (_) => const _AlertCardShimmer()),
-          )
-        else if (_latestError != null)
+        if (_latestError != null)
           Center(child: Text(_latestError!, style: TextStyle(color: Theme.of(context).colorScheme.error)))
-        else if (_latestRappels.isEmpty)
+        else if (!_isLoadingLatest && _latestRappels.isEmpty)
           Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -201,14 +191,26 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           )
         else
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 0.72,
-            children: List.generate(_latestRappels.length, (i) => _buildLatestRappelCard(_latestRappels[i], context)),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const spacing = 10.0;
+              const descHeight = 118.0;
+              final cardWidth = (constraints.maxWidth - spacing) / 2;
+              final imageHeight = cardWidth / 1.1;
+              final ratio = cardWidth / (imageHeight + descHeight);
+              final items = _isLoadingLatest
+                  ? List.generate(4, (_) => const _AlertCardShimmer())
+                  : List.generate(_latestRappels.length, (i) => _buildLatestRappelCard(_latestRappels[i], context));
+              return GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: spacing,
+                mainAxisSpacing: spacing,
+                childAspectRatio: ratio,
+                children: items,
+              );
+            },
           ),
         const SizedBox(height: 8),
         SizedBox(
@@ -307,19 +309,21 @@ class _HomeScreenState extends State<HomeScreen> {
       clipBehavior: Clip.hardEdge,
       child: InkWell(
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RappelDetailsPage(rappel: rappel))),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Image en haut
+        child: Column(children: [
+          // Image responsive (s'adapte à la largeur de la carte)
           Stack(children: [
-            SizedBox(
-              height: 120,
-              width: double.infinity,
+            AspectRatio(
+              aspectRatio: 1.1,
               child: rawImageUrl != null
                   ? Image.network(
                       _proxiedUrl(rawImageUrl),
                       fit: BoxFit.cover,
                       loadingBuilder: (context, child, loadingProgress) {
                         if (loadingProgress == null) return child;
-                        return Container(color: cs.primaryContainer, child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary))));
+                        return Container(
+                          color: cs.primaryContainer,
+                          child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary))),
+                        );
                       },
                       errorBuilder: (_, __, ___) => _categoryPlaceholder(categorie, cs),
                     )
@@ -329,35 +333,47 @@ class _HomeScreenState extends State<HomeScreen> {
               Positioned(
                 top: 8, right: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(color: cs.primary, borderRadius: BorderRadius.circular(8)),
-                  child: Text('NOUVEAU', style: TextStyle(color: cs.onPrimary, fontSize: 9, fontWeight: FontWeight.bold)),
+                  child: Text('NOUVEAU', style: TextStyle(color: cs.onPrimary, fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
               ),
           ]),
-          // Description en bas
+          // Description centrée
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(title,
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, height: 1.3),
-                  maxLines: 3, overflow: TextOverflow.ellipsis),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, height: 1.35),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
                   if (brand.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(brand, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 6),
+                    Text(
+                      brand,
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
                   ],
                   if (formattedDate.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Row(children: [
-                      Icon(Icons.calendar_today_outlined, size: 10, color: cs.primary),
-                      const SizedBox(width: 3),
-                      Text(formattedDate, style: TextStyle(color: cs.primary, fontSize: 10, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 6),
+                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(Icons.calendar_today_outlined, size: 12, color: cs.primary),
+                      const SizedBox(width: 4),
+                      Text(formattedDate, style: TextStyle(color: cs.primary, fontSize: 12, fontWeight: FontWeight.w600)),
                     ]),
                   ],
-                ]),
-              ]),
+                ],
+              ),
             ),
           ),
         ]),
@@ -558,7 +574,10 @@ class _AlertCardShimmerState extends State<_AlertCardShimmer> with SingleTickerP
       builder: (_, __) => Card(
         margin: EdgeInsets.zero,
         child: Column(children: [
-          Container(height: 120, width: double.infinity, color: cs.primaryContainer.withValues(alpha: _anim.value)),
+          AspectRatio(
+            aspectRatio: 1.1,
+            child: Container(color: cs.primaryContainer.withValues(alpha: _anim.value)),
+          ),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(10),
