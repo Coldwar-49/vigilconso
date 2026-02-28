@@ -6,7 +6,6 @@ import 'package:vigiconso/screens/barcode_scanner.dart';
 import 'package:vigiconso/screens/categories_screen.dart';
 import 'package:vigiconso/screens/rappel_screen.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
-import 'package:vigiconso/widgets/shimmer_loading.dart';
 import 'package:vigiconso/services/subscribe_to_newsletter.dart' show NotificationService;
 import 'package:vigiconso/services/rappel_service.dart';
 import 'package:vigiconso/screens/rappel_details_page.dart';
@@ -42,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadLatestRappels({bool forceRefresh = false}) async {
     setState(() { _isLoadingLatest = true; _latestError = null; });
     try {
-      final results = await RappelService.fetchLatestRappels(limit: 5);
+      final results = await RappelService.fetchLatestRappels(limit: 4);
       if (mounted) setState(() { _latestRappels = results; _isLoadingLatest = false; });
     } catch (e) {
       if (mounted) setState(() { _isLoadingLatest = false; _latestError = 'Impossible de charger les alertes.'; });
@@ -183,8 +182,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ]),
         const SizedBox(height: 12),
         if (_isLoadingLatest)
-          // Shimmer skeleton pendant le chargement
-          ...List.generate(3, (_) => const HomeAlertShimmer())
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 0.72,
+            children: List.generate(4, (_) => const _AlertCardShimmer()),
+          )
         else if (_latestError != null)
           Center(child: Text(_latestError!, style: TextStyle(color: Theme.of(context).colorScheme.error)))
         else if (_latestRappels.isEmpty)
@@ -195,7 +201,15 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           )
         else
-          ...List.generate(_latestRappels.length, (i) => _buildLatestRappelCard(_latestRappels[i], context)),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 0.72,
+            children: List.generate(_latestRappels.length, (i) => _buildLatestRappelCard(_latestRappels[i], context)),
+          ),
         const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
@@ -276,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final brand = rappel['marque_produit'] ?? rappel['nom_marque'] ?? '';
     final dateStr = rappel['date_publication'] ?? '';
     final categorie = rappel['categorie_de_produit'] as String?;
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     String formattedDate = '';
     bool isNew = false;
     if (dateStr.isNotEmpty) {
@@ -286,71 +300,67 @@ class _HomeScreenState extends State<HomeScreen> {
         isNew = DateTime.now().difference(parsed).inDays <= 7;
       } catch (_) { formattedDate = dateStr; }
     }
-
     final rawImageUrl = _extractFirstImageUrl(rappel['liens_vers_les_images']);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.hardEdge,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RappelDetailsPage(rappel: rappel))),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(children: [
-            // Image 64x64
-            Container(
-              width: 64,
-              height: 64,
-              clipBehavior: Clip.hardEdge,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: colorScheme.primaryContainer,
-              ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Image en haut
+          Stack(children: [
+            SizedBox(
+              height: 120,
+              width: double.infinity,
               child: rawImageUrl != null
                   ? Image.network(
                       _proxiedUrl(rawImageUrl),
-                      width: 64, height: 64,
                       fit: BoxFit.cover,
                       loadingBuilder: (context, child, loadingProgress) {
                         if (loadingProgress == null) return child;
-                        return Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary)));
+                        return Container(color: cs.primaryContainer, child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary))));
                       },
-                      errorBuilder: (_, __, ___) => _categoryPlaceholder(categorie, colorScheme),
+                      errorBuilder: (_, __, ___) => _categoryPlaceholder(categorie, cs),
                     )
-                  : _categoryPlaceholder(categorie, colorScheme),
+                  : _categoryPlaceholder(categorie, cs),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Expanded(
-                    child: Text(title,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, height: 1.3),
-                      maxLines: 2, overflow: TextOverflow.ellipsis),
-                  ),
-                  if (isNew) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: colorScheme.primary, borderRadius: BorderRadius.circular(8)),
-                      child: Text('NOUVEAU', style: TextStyle(color: colorScheme.onPrimary, fontSize: 9, fontWeight: FontWeight.bold)),
-                    ),
+            if (isNew)
+              Positioned(
+                top: 8, right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(color: cs.primary, borderRadius: BorderRadius.circular(8)),
+                  child: Text('NOUVEAU', style: TextStyle(color: cs.onPrimary, fontSize: 9, fontWeight: FontWeight.bold)),
+                ),
+              ),
+          ]),
+          // Description en bas
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Text(title,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, height: 1.3),
+                  maxLines: 3, overflow: TextOverflow.ellipsis),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  if (brand.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(brand, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
+                  if (formattedDate.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      Icon(Icons.calendar_today_outlined, size: 10, color: cs.primary),
+                      const SizedBox(width: 3),
+                      Text(formattedDate, style: TextStyle(color: cs.primary, fontSize: 10, fontWeight: FontWeight.w500)),
+                    ]),
                   ],
                 ]),
-                const SizedBox(height: 4),
-                if (brand.isNotEmpty)
-                  Text(brand, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12)),
-                if (formattedDate.isNotEmpty)
-                  Row(children: [
-                    Icon(Icons.calendar_today_outlined, size: 11, color: colorScheme.primary),
-                    const SizedBox(width: 4),
-                    Text(formattedDate, style: TextStyle(color: colorScheme.primary, fontSize: 11, fontWeight: FontWeight.w500)),
-                  ]),
               ]),
             ),
-            Icon(Icons.chevron_right, color: colorScheme.outline),
-          ]),
-        ),
+          ),
+        ]),
       ),
     );
   }
@@ -516,5 +526,53 @@ class _HomeScreenState extends State<HomeScreen> {
       final granted = await NotificationService.subscribe();
       setState(() { _notificationsEnabled = granted; _isTogglingNotification = false; });
     }
+  }
+}
+
+/// Shimmer placeholder pour une card de la grille d'alertes
+class _AlertCardShimmer extends StatefulWidget {
+  const _AlertCardShimmer();
+  @override
+  State<_AlertCardShimmer> createState() => _AlertCardShimmerState();
+}
+
+class _AlertCardShimmerState extends State<_AlertCardShimmer> with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat(reverse: true);
+    _anim = Tween<double>(begin: 0.3, end: 1.0).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (_, __) => Card(
+        margin: EdgeInsets.zero,
+        child: Column(children: [
+          Container(height: 120, width: double.infinity, color: cs.primaryContainer.withValues(alpha: _anim.value)),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(height: 12, width: double.infinity, decoration: BoxDecoration(color: cs.primaryContainer.withValues(alpha: _anim.value), borderRadius: BorderRadius.circular(6))),
+                const SizedBox(height: 6),
+                Container(height: 12, width: 80, decoration: BoxDecoration(color: cs.primaryContainer.withValues(alpha: _anim.value), borderRadius: BorderRadius.circular(6))),
+                const Spacer(),
+                Container(height: 10, width: 70, decoration: BoxDecoration(color: cs.primaryContainer.withValues(alpha: _anim.value), borderRadius: BorderRadius.circular(6))),
+              ]),
+            ),
+          ),
+        ]),
+      ),
+    );
   }
 }
