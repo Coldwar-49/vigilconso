@@ -16,10 +16,13 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
   bool _isFullScreenImage = false;
   String? _fullScreenImageUrl;
   bool _isFavorite = false;
+  late final PageController _imagePageController;
+  int _currentImagePage = 0;
 
   @override
   void initState() {
     super.initState();
+    _imagePageController = PageController();
     _checkFavoriteStatus();
   }
 
@@ -27,6 +30,12 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
     final id = widget.rappel['reference_fiche'] ?? widget.rappel['libelle'] ?? '';
     final fav = await FavoritesService.isFavorite(id);
     if (mounted) setState(() => _isFavorite = fav);
+  }
+
+  @override
+  void dispose() {
+    _imagePageController.dispose();
+    super.dispose();
   }
 
   Future<void> _toggleFavorite() async {
@@ -72,7 +81,7 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildImagesSection(imageUrls),
                   const SizedBox(height: 20),
@@ -162,101 +171,99 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
 
   Widget _buildImagesSection(List<String> imageUrls) {
     final cs = Theme.of(context).colorScheme;
+
+    // Placeholder si aucune image
     if (imageUrls.isEmpty) {
       return Container(
         height: 200,
         width: double.infinity,
         decoration: BoxDecoration(
           color: cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.image_not_supported, size: 50, color: cs.outline),
-              const SizedBox(height: 8),
-              Text('Aucune image disponible', style: TextStyle(color: cs.onSurfaceVariant)),
-            ],
-          ),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.image_not_supported, size: 50, color: cs.outline),
+            const SizedBox(height: 8),
+            Text('Aucune image disponible', style: TextStyle(color: cs.onSurfaceVariant)),
+          ]),
         ),
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          height: 250,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: imageUrls.length,
-            itemBuilder: (context, index) {
-              return Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _fullScreenImageUrl = imageUrls[index];
-                      _isFullScreenImage = true;
-                    });
-                  },
-                  child: Hero(
-                    tag: 'product_image_${imageUrls[index]}',
-                    child: Container(
-                      width: MediaQuery.of(context).size.width * 0.8,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: _buildNetworkImageWithFallback(
-                          imageUrls[index],
-                          fit: BoxFit.cover,
-                          hasError: (ctx) => Container(
-                            color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.image_not_supported, size: 40,
-                                      color: Theme.of(ctx).colorScheme.outline),
-                                  const SizedBox(height: 8),
-                                  Text('Image non disponible',
-                                      style: TextStyle(color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+    return Column(children: [
+      // Conteneur image pleine largeur
+      Container(
+        width: double.infinity,
+        height: 280,
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: imageUrls.length == 1
+            // Image unique — centrée, visible en entier
+            ? GestureDetector(
+                onTap: () => setState(() {
+                  _fullScreenImageUrl = imageUrls[0];
+                  _isFullScreenImage = true;
+                }),
+                child: _buildNetworkImageWithFallback(
+                  imageUrls[0],
+                  fit: BoxFit.contain,
+                  hasError: (ctx) => Center(child: Icon(Icons.image_not_supported, size: 50, color: cs.outline)),
+                ),
+              )
+            // Plusieurs images — PageView centré
+            : PageView.builder(
+                controller: _imagePageController,
+                itemCount: imageUrls.length,
+                onPageChanged: (i) => setState(() => _currentImagePage = i),
+                itemBuilder: (_, i) => GestureDetector(
+                  onTap: () => setState(() {
+                    _fullScreenImageUrl = imageUrls[i];
+                    _isFullScreenImage = true;
+                  }),
+                  child: _buildNetworkImageWithFallback(
+                    imageUrls[i],
+                    fit: BoxFit.contain,
+                    hasError: (ctx) => Center(child: Icon(Icons.image_not_supported, size: 50, color: cs.outline)),
                   ),
                 ),
-              );
-            },
+              ),
+      ),
+      // Indicateur de pages (points) si plusieurs images
+      if (imageUrls.length > 1) ...[
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(imageUrls.length, (i) => AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            width: _currentImagePage == i ? 14 : 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: _currentImagePage == i ? cs.primary : cs.outline,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          )),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Image ${_currentImagePage + 1} / ${imageUrls.length}  •  appuyez pour agrandir',
+          style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+          textAlign: TextAlign.center,
+        ),
+      ] else
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            'Appuyez sur l\'image pour l\'agrandir',
+            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+            textAlign: TextAlign.center,
           ),
         ),
-        const SizedBox(height: 10),
-        if (imageUrls.length > 1)
-          Center(
-            child: Text(
-              'Faites défiler pour voir plus d\'images (${imageUrls.length})',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ),
-      ],
-    );
+    ]);
   }
 
   /// Retourne l'URL de l'image en passant par un proxy CORS si on est sur Web.
