@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Flutter Web",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "C:/Users/fabri/flutter/bin/flutter.bat", "run", "-d", "chrome"],
+      "port": 8080
+    },
+    {
+      "name": "Newsletter API",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["newsletter-api/index.js"],
+      "port": 3000
+    }
+  ]
+}

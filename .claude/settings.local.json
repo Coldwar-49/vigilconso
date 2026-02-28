@@ -2,7 +2,21 @@
   "permissions": {
     "allow": [
       "Bash(du:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(python3:*)",
+      "Bash(python -c:*)",
+      "Bash(curl:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(where:*)",
+      "Bash(npm install)",
+      "Bash(git -C /c/Users/fabri/vigilconso remote get-url:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh run view:*)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:coldwar-49.github.io)"
     ]
   }
 }

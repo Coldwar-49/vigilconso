@@ -1,0 +1,38 @@
+name: Vérification automatique des alertes RappelConso
+
+on:
+  schedule:
+    # Toutes les 6 heures (00h, 06h, 12h, 18h UTC)
+    - cron: '0 0,6,12,18 * * *'
+  workflow_dispatch: # Permet aussi de lancer manuellement depuis GitHub
+
+jobs:
+  check-alerts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installer les dépendances
+        run: pip install requests
+
+      - name: Vérifier les alertes et envoyer la notification
+        env:
+          ONESIGNAL_API_KEY: ${{ secrets.ONESIGNAL_API_KEY }}
+        run: python scripts/check_and_notify.py
+
+      - name: Sauvegarder la date de la dernière alerte
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add scripts/last_alert_date.txt
+          git diff --staged --quiet || git commit -m "chore: mise à jour date dernière alerte"
+          git push

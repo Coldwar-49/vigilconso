@@ -1,9 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:vigiconso/screens/main_screen.dart';
 
-void main() {
+/// Remplace par ton App ID OneSignal (Settings > Keys & IDs dans le dashboard)
+const String _oneSignalAppId = 'eb3fd80e-1a70-468f-ab2e-e1d2eb9592ab';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialisation OneSignal (push notifications)
+  OneSignal.initialize(_oneSignalAppId);
+
   runApp(const RappelConsoApp());
 }
 
@@ -84,15 +92,3 @@ class RappelConsoApp extends StatelessWidget {
   }
 }
 
-class NewsletterService {
-  static Future<bool> subscribeToNewsletter(String email) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_email', email);
-      return true;
-    } catch (e) {
-      debugPrint('Erreur d\'enregistrement: $e');
-      return false;
-    }
-  }
-}

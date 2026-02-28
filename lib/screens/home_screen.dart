@@ -7,7 +7,7 @@ import 'package:vigiconso/screens/categories_screen.dart';
 import 'package:vigiconso/screens/rappel_screen.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
 import 'package:vigiconso/widgets/shimmer_loading.dart';
-import 'package:vigiconso/services/subscribe_to_newsletter.dart';
+import 'package:vigiconso/services/subscribe_to_newsletter.dart' show NotificationService;
 import 'package:vigiconso/services/rappel_service.dart';
 import 'package:vigiconso/screens/rappel_details_page.dart';
 
@@ -18,16 +18,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _emailController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  bool _isSubscribing = false;
-  String? _subscriptionMessage;
-  bool _isError = false;
   bool _showScrollToTopButton = false;
   List<dynamic> _latestRappels = [];
   bool _isLoadingLatest = true;
   String? _latestError;
+  bool _notificationsEnabled = false;
+  bool _isTogglingNotification = false;
   @override
   void initState() {
     super.initState();
@@ -39,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     });
     _loadLatestRappels();
+    _notificationsEnabled = NotificationService.isSubscribed();
   }
 
   Future<void> _loadLatestRappels({bool forceRefresh = false}) async {
@@ -53,7 +51,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    _emailController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -461,80 +458,63 @@ class _HomeScreenState extends State<HomeScreen> {
     ]);
   }
   Widget _buildNewsletterCard() {
+    final cs = Theme.of(context).colorScheme;
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Icon(Icons.email_outlined, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(width: 8),
-              const Text('Restez informe', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            ]),
-            const SizedBox(height: 8),
-            const Text('Recevez les alertes de rappel dans votre boite mail.', style: TextStyle(fontSize: 14, color: Colors.grey)),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _emailController,
-              decoration: InputDecoration(
-                labelText: 'Votre adresse email',
-                hintText: 'exemple@email.com',
-                hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                filled: true,
-                fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                prefixIcon: Icon(Icons.email, color: Theme.of(context).colorScheme.primary),
-              ),
-              keyboardType: TextInputType.emailAddress,
-              validator: (value) {
-                if (value == null || value.isEmpty || !value.contains('@') || !value.contains('.')) return 'Adresse email invalide';
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: _subscriptionMessage != null
-                  ? Padding(
-                      key: ValueKey<String>(_subscriptionMessage!),
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(children: [
-                        Icon(_isError ? Icons.error : Icons.check_circle, color: _isError ? Colors.red : Colors.green, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(_subscriptionMessage!, style: TextStyle(color: _isError ? Colors.red : Colors.green, fontWeight: FontWeight.bold))),
-                      ]),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isSubscribing ? null : _subscribeToNewsletter,
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                child: _isSubscribing
-                    ? const Row(mainAxisAlignment: MainAxisAlignment.center, children: [SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)), SizedBox(width: 10), Text('Envoi en cours...')])
-                    : const Text("S'inscrire", style: TextStyle(fontSize: 16)),
-              ),
-            ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(Icons.notifications_active_outlined, color: cs.primary),
+            const SizedBox(width: 8),
+            const Text('Alertes instantanees', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           ]),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            _notificationsEnabled
+                ? 'Vous recevrez une notification des qu\'un nouveau rappel est publie.'
+                : 'Activez les notifications pour etre alerte des nouveaux rappels de produits.',
+            style: const TextStyle(fontSize: 14, color: Colors.grey),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: _notificationsEnabled
+                ? OutlinedButton.icon(
+                    icon: const Icon(Icons.notifications_off_outlined),
+                    label: const Text('Desactiver les notifications'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: _isTogglingNotification ? null : _toggleNotifications,
+                  )
+                : ElevatedButton.icon(
+                    icon: _isTogglingNotification
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.notifications_active),
+                    label: Text(_isTogglingNotification ? 'Activation...' : 'Activer les notifications'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: _isTogglingNotification ? null : _toggleNotifications,
+                  ),
+          ),
+        ]),
       ),
     );
   }
 
-  Future<void> _subscribeToNewsletter() async {
-    if (!_formKey.currentState!.validate()) return;
-    final email = _emailController.text.trim();
-    setState(() { _isSubscribing = true; _subscriptionMessage = null; });
-    final result = await subscribeToNewsletter(email);
-    setState(() {
-      _isSubscribing = false;
-      _isError = !result['success'];
-      _subscriptionMessage = result['message'];
-      if (result['success']) _emailController.clear();
-    });
+  Future<void> _toggleNotifications() async {
+    setState(() => _isTogglingNotification = true);
+    if (_notificationsEnabled) {
+      await NotificationService.unsubscribe();
+      setState(() { _notificationsEnabled = false; _isTogglingNotification = false; });
+    } else {
+      final granted = await NotificationService.subscribe();
+      setState(() { _notificationsEnabled = granted; _isTogglingNotification = false; });
+    }
   }
 }

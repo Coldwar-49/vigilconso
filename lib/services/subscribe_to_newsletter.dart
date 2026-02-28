@@ -1,29 +1,25 @@
 // lib/services/subscribe_to_newsletter.dart
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 
-Future<Map<String, dynamic>> subscribeToNewsletter(String email) async {
-  try {
-    final response = await http.post(
-      Uri.parse('https://api.vigilconso.fr/newsletter'), // Remplace par ton URL réelle
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email}),
-    );
+/// Service de gestion des notifications push via OneSignal.
+class NotificationService {
+  /// Vérifie si l'utilisateur a activé les notifications push.
+  static bool isSubscribed() {
+    return OneSignal.User.pushSubscription.optedIn ?? false;
+  }
 
-    if (response.statusCode == 200) {
-      return {'success': true, 'message': 'Inscription réussie !'};
-    } else {
-      final body = jsonDecode(response.body);
-      return {
-        'success': false,
-        'message': body['message'] ?? 'Une erreur s\'est produite.'
-      };
+  /// Demande la permission et active les notifications push.
+  /// Retourne true si l'utilisateur a accepté.
+  static Future<bool> subscribe() async {
+    final granted = await OneSignal.Notifications.requestPermission(true);
+    if (granted) {
+      await OneSignal.User.pushSubscription.optIn();
     }
-  } catch (e) {
-    return {
-      'success': false,
-      'message': 'Erreur réseau. Veuillez réessayer plus tard.'
-    };
+    return granted;
+  }
+
+  /// Désactive les notifications push.
+  static Future<void> unsubscribe() async {
+    await OneSignal.User.pushSubscription.optOut();
   }
 }
-

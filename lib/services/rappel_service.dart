@@ -130,14 +130,11 @@ class RappelService {
   }
 
   /// Récupère les N derniers rappels toutes catégories confondues (pour l'accueil).
-  /// Utilise un filtre de date car l'API ignore sort ET interdit offset > 9900.
+  /// Utilise order_by=date_publication desc pour obtenir directement les plus récents.
   static Future<List<dynamic>> fetchLatestRappels({int limit = 5}) async {
     try {
-      final year = DateTime.now().year - 1;
-      final dateFilter =
-          Uri.encodeQueryComponent('date_publication >= "$year-01-01"');
       final apiUrl =
-          '${AppConstants.apiBaseUrl}/records?limit=100&where=$dateFilter';
+          '${AppConstants.apiBaseUrl}/records?limit=$limit&order_by=date_publication%20desc';
 
       final response = await http
           .get(Uri.parse(apiUrl))
@@ -148,7 +145,7 @@ class RappelService {
         final List<dynamic> results =
             List<dynamic>.from(data['results'] ?? []);
 
-        // Tri local du plus récent au plus ancien
+        // Tri local en secours si order_by est ignoré par l'API
         results.sort((a, b) {
           final dateA = _parseDate(a['date_publication'] ?? '');
           final dateB = _parseDate(b['date_publication'] ?? '');
