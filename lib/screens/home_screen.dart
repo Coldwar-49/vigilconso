@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,6 +19,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
+  late final PageController _alertPageController;
+  Timer? _autoScrollTimer;
   bool _showScrollToTopButton = false;
   List<dynamic> _latestRappels = [];
   bool _isLoadingLatest = true;
@@ -27,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _alertPageController = PageController(viewportFraction: 0.5);
     _scrollController.addListener(() {
       if (_scrollController.offset > 300 && !_showScrollToTopButton) {
         setState(() => _showScrollToTopButton = true);
@@ -38,11 +42,28 @@ class _HomeScreenState extends State<HomeScreen> {
     _notificationsEnabled = NotificationService.isSubscribed();
   }
 
+  void _startAutoScroll() {
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!_alertPageController.hasClients || _latestRappels.isEmpty) return;
+      final current = _alertPageController.page?.round() ?? 0;
+      final next = (current + 1) % _latestRappels.length;
+      _alertPageController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
   Future<void> _loadLatestRappels({bool forceRefresh = false}) async {
     setState(() { _isLoadingLatest = true; _latestError = null; });
     try {
       final results = await RappelService.fetchLatestRappels(limit: 5);
-      if (mounted) setState(() { _latestRappels = results; _isLoadingLatest = false; });
+      if (mounted) {
+        setState(() { _latestRappels = results; _isLoadingLatest = false; });
+        _startAutoScroll();
+      }
     } catch (e) {
       if (mounted) setState(() { _isLoadingLatest = false; _latestError = 'Impossible de charger les alertes.'; });
     }
@@ -50,6 +71,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _autoScrollTimer?.cancel();
+    _alertPageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -193,21 +216,30 @@ class _HomeScreenState extends State<HomeScreen> {
         else
           LayoutBuilder(
             builder: (context, constraints) {
-              // Chaque carte occupe ~58% de l'écran → on voit qu'il y en a d'autres
-              final cardWidth = constraints.maxWidth * 0.58;
-              final imageHeight = cardWidth / 1.1;
-              final cardHeight = imageHeight + 118;
-              final items = _isLoadingLatest
-                  ? List.generate(5, (_) => _AlertCardShimmer(width: cardWidth, height: cardHeight))
-                  : List.generate(_latestRappels.length, (i) => _buildLatestRappelCard(_latestRappels[i], context, cardWidth: cardWidth));
+              final cardWidth = constraints.maxWidth * 0.50;
+              final imageHeight = cardWidth / 1.4;
+              final cardHeight = imageHeight + 95;
+              if (_isLoadingLatest) {
+                return SizedBox(
+                  height: cardHeight,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.zero,
+                    itemCount: 5,
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemBuilder: (_, __) => _AlertCardShimmer(width: cardWidth, height: cardHeight),
+                  ),
+                );
+              }
               return SizedBox(
                 height: cardHeight,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.zero,
-                  itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (_, i) => SizedBox(width: cardWidth, child: items[i]),
+                child: PageView.builder(
+                  controller: _alertPageController,
+                  itemCount: _latestRappels.length,
+                  itemBuilder: (_, i) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    child: _buildLatestRappelCard(_latestRappels[i], context),
+                  ),
                 ),
               );
             },
@@ -287,7 +319,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildLatestRappelCard(dynamic rappel, BuildContext context, {double? cardWidth}) {
+  Widget _buildLatestRappelCard(dynamic rappel, BuildContext context) {
     final title = rappel['libelle'] ?? rappel['libelle_produit'] ?? 'Produit sans nom';
     final brand = rappel['marque_produit'] ?? rappel['nom_marque'] ?? '';
     final dateStr = rappel['date_publication'] ?? '';
@@ -313,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Image responsive (s'adapte à la largeur de la carte)
           Stack(children: [
             AspectRatio(
-              aspectRatio: 1.1,
+              aspectRatio: 1.4,
               child: rawImageUrl != null
                   ? Image.network(
                       _proxiedUrl(rawImageUrl),
@@ -342,7 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // Description centrée
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
