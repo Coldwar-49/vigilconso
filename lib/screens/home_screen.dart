@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vigiconso/screens/barcode_scanner.dart';
 import 'package:vigiconso/screens/categories_screen.dart';
 import 'package:vigiconso/screens/rappel_screen.dart';
@@ -24,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _latestRappels = [];
   bool _isLoadingLatest = true;
   String? _latestError;
+  int _newAlertsCount = 0;
   bool _notificationsEnabled = false;
   bool _isTogglingNotification = false;
   @override
@@ -60,11 +62,47 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final results = await RappelService.fetchLatestRappels(limit: 5);
       if (mounted) {
-        setState(() { _latestRappels = results; _isLoadingLatest = false; });
+        final newCount = await _countNewAlerts(results);
+        await _saveLastSeenDate(results);
+        setState(() {
+          _latestRappels = results;
+          _newAlertsCount = newCount;
+          _isLoadingLatest = false;
+        });
         _startAutoScroll();
       }
     } catch (e) {
       if (mounted) setState(() { _isLoadingLatest = false; _latestError = 'Impossible de charger les alertes.'; });
+    }
+  }
+
+  /// Compte les alertes plus récentes que la dernière visite
+  Future<int> _countNewAlerts(List<dynamic> rappels) async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastSeenStr = prefs.getString('last_seen_alert_date');
+    if (lastSeenStr == null) return 0;
+    final lastSeen = DateTime.tryParse(lastSeenStr);
+    if (lastSeen == null) return 0;
+    int count = 0;
+    for (final r in rappels) {
+      final dateStr = r['date_publication'] ?? '';
+      final date = DateTime.tryParse(dateStr);
+      if (date != null && date.isAfter(lastSeen)) count++;
+    }
+    return count;
+  }
+
+  /// Sauvegarde la date de la plus récente alerte vue
+  Future<void> _saveLastSeenDate(List<dynamic> rappels) async {
+    if (rappels.isEmpty) return;
+    DateTime? newest;
+    for (final r in rappels) {
+      final date = DateTime.tryParse(r['date_publication'] ?? '');
+      if (date != null && (newest == null || date.isAfter(newest))) newest = date;
+    }
+    if (newest != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_seen_alert_date', newest.toIso8601String());
     }
   }
 
@@ -202,6 +240,30 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () => _loadLatestRappels(forceRefresh: true),
           ),
         ]),
+        if (_newAlertsCount > 0) ...[
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Row(children: [
+              const Icon(Icons.new_releases_outlined, color: Colors.red, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _newAlertsCount == 1
+                      ? '1 nouvelle alerte depuis votre dernière visite'
+                      : '$_newAlertsCount nouvelles alertes depuis votre dernière visite',
+                  style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              ),
+            ]),
+          ),
+        ],
         const SizedBox(height: 12),
         if (_latestError != null)
           Center(child: Text(_latestError!, style: TextStyle(color: Theme.of(context).colorScheme.error)))
