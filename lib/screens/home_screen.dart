@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -273,48 +272,22 @@ class _HomeScreenState extends State<HomeScreen> {
     return null;
   }
 
-  /// Retourne l'URL proxiée via wsrv.nl sur Web pour contourner le CORS
+  /// Retourne l'URL proxiée via wsrv.nl pour corriger le chargement des images
   String _proxiedUrl(String url) {
-    if (!kIsWeb) return url;
     final encoded = Uri.encodeComponent(url);
     return 'https://wsrv.nl/?url=$encoded&output=jpg&q=85';
   }
 
-  /// Placeholder élégant : icône de catégorie sur fond dégradé
+  /// Placeholder affiché quand aucune image n'est disponible
   Widget _categoryPlaceholder(String? categorie, ColorScheme cs) {
-    final cat = (categorie ?? '').toLowerCase();
-    IconData icon;
-    if (cat.contains('vêtement') || cat.contains('mode') || cat.contains('habillement') || cat.contains('epi')) {
-      icon = Icons.checkroom_outlined;
-    } else if (cat.contains('aliment') || cat.contains('denrée') || cat.contains('boisson') || cat.contains('épicerie') || cat.contains('viande') || cat.contains('poisson')) {
-      icon = Icons.lunch_dining_outlined;
-    } else if (cat.contains('automobile') || cat.contains('véhicule') || cat.contains('transport') || cat.contains('moto')) {
-      icon = Icons.directions_car_outlined;
-    } else if (cat.contains('électrique') || cat.contains('électronique') || cat.contains('appareil') || cat.contains('outil')) {
-      icon = Icons.electrical_services_outlined;
-    } else if (cat.contains('jouet') || cat.contains('enfant') || cat.contains('bébé') || cat.contains('puéricult')) {
-      icon = Icons.toys_outlined;
-    } else if (cat.contains('cosmétique') || cat.contains('hygiène') || cat.contains('beauté') || cat.contains('soin')) {
-      icon = Icons.face_retouching_natural_outlined;
-    } else if (cat.contains('médicament') || cat.contains('santé') || cat.contains('pharma')) {
-      icon = Icons.medication_outlined;
-    } else if (cat.contains('jardin') || cat.contains('bricolage')) {
-      icon = Icons.handyman_outlined;
-    } else if (cat.contains('animal') || cat.contains('animaux')) {
-      icon = Icons.pets_outlined;
-    } else {
-      icon = Icons.inventory_2_outlined;
-    }
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [cs.primaryContainer, cs.secondaryContainer],
-        ),
-      ),
+      color: cs.surfaceContainerHighest,
       child: Center(
-        child: Icon(icon, size: 28, color: cs.primary.withOpacity(0.75)),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(Icons.image_not_supported_outlined, size: 22, color: cs.onSurfaceVariant),
+          const SizedBox(height: 2),
+          Text('Image indisponible', style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant)),
+        ]),
       ),
     );
   }

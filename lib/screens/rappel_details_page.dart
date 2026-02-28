@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
 import 'package:vigiconso/services/favorites_service.dart';
@@ -266,10 +265,8 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
     ]);
   }
 
-  /// Retourne l'URL de l'image en passant par un proxy CORS si on est sur Web.
-  /// wsrv.nl est un CDN/proxy gratuit qui ajoute les headers CORS manquants.
+  /// Retourne l'URL de l'image via le proxy wsrv.nl (toutes plateformes).
   String _proxiedImageUrl(String url) {
-    if (!kIsWeb) return url;
     final encoded = Uri.encodeComponent(url);
     return 'https://wsrv.nl/?url=$encoded&output=jpg&q=85';
   }
