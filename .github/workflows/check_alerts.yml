@@ -6,6 +6,9 @@ on:
     - cron: '0 0,6,12,18 * * *'
   workflow_dispatch: # Permet aussi de lancer manuellement depuis GitHub
 
+permissions:
+  contents: write
+
 jobs:
   check-alerts:
     runs-on: ubuntu-latest
