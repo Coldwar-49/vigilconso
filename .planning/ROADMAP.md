@@ -44,11 +44,13 @@
 4. Les filtres (risque, date, marque) réduisent visiblement les résultats de la liste
 5. Un rappel peut être marqué lu/non-lu avec persistance entre sessions
 
-**Plans:**
-1. Recherche globale multi-catégorie + écran de recherche dédié
-2. Filtres avancés (panel de filtres, chips, persistance)
-3. Historique de recherche + suggestions (SharedPreferences)
-4. Statut lu/non-lu (SharedPreferences, badge visuel)
+**Plans:** 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Recherche globale + SearchScreen (correction bypass cache, wave 1)
+- [ ] 01-02-PLAN.md — FilterPanel (filtres avancés + tri, wave 2)
+- [ ] 01-03-PLAN.md — Historique + autocomplétion (wave 2, parallèle avec Plan 2)
+- [ ] 01-04-PLAN.md — Statut lu/non-lu (badge NON LU + persistance, wave 2, parallèle)
 
 ---
 
@@ -211,4 +213,4 @@ Phase 1 et Phase 2 peuvent être lancées en parallèle si nécessaire (elles to
 ---
 
 *Roadmap created: 2026-06-16*
-*Next: `/gsd-discuss-phase 1` ou `/gsd-plan-phase 1`*
+*Plans Phase 1 created: 2026-06-17*
