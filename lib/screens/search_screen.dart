@@ -1,12 +1,78 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vigiconso/screens/rappel_details_page.dart';
 import 'package:vigiconso/services/rappel_service.dart';
+import 'package:vigiconso/widgets/filter_panel.dart';
 
 class SearchScreen extends StatefulWidget {
   final String initialQuery;
   const SearchScreen({super.key, this.initialQuery = ''});
+
+  // ── Méthodes statiques publiques (accessibles depuis les tests) ───────────
+
+  /// Filtre client-side par niveau de risque (OR logic).
+  /// riskLevels: {'grave', 'modéré', 'faible'} — vide = pas de filtre.
+  static List<dynamic> applyRiskFilter(
+      Set<String> riskLevels, List<dynamic> results) {
+    if (riskLevels.isEmpty) return results;
+    return results.where((r) {
+      final risque = (r['risques_encourus'] ?? '').toString().toLowerCase();
+      for (final level in riskLevels) {
+        if (level == 'grave' &&
+            (risque.contains('grave') ||
+                risque.contains('sérieux') ||
+                risque.contains('serieux') ||
+                risque.contains('élevé') ||
+                risque.contains('eleve'))) {
+          return true;
+        }
+        if (level == 'modéré' &&
+            (risque.contains('modéré') ||
+                risque.contains('moderé') ||
+                risque.contains('moyen'))) {
+          return true;
+        }
+        if (level == 'faible' &&
+            (risque.contains('faible') ||
+                risque.contains('bénin') ||
+                risque.contains('benin'))) {
+          return true;
+        }
+      }
+      return false;
+    }).toList();
+  }
+
+  /// Filtre client-side par marque (case-insensitive contains sur marque_produit).
+  static List<dynamic> applyBrandFilter(
+      String keyword, List<dynamic> results) {
+    if (keyword.isEmpty) return results;
+    final kw = keyword.toLowerCase();
+    return results.where((r) {
+      final brand =
+          (r['marque_produit'] ?? r['nom_marque'] ?? '').toString().toLowerCase();
+      return brand.contains(kw);
+    }).toList();
+  }
+
+  /// Filtre client-side par statut lu/non-lu.
+  /// readFilter: 'all' = pas de filtre, 'unread' = non lus, 'read' = lus.
+  /// readIds: Set des IDs de rappels déjà lus.
+  static List<dynamic> applyReadFilter(
+      String readFilter, List<dynamic> results, Set<String> readIds) {
+    if (readFilter == 'all') return results;
+    return results.where((r) {
+      final id = r['reference_fiche']?.toString() ??
+          r['libelle']?.toString() ??
+          r['numero_fiche']?.toString() ??
+          '';
+      final isRead = id.isNotEmpty && readIds.contains(id);
+      return readFilter == 'unread' ? !isRead : isRead;
+    }).toList();
+  }
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -24,6 +90,11 @@ class _SearchScreenState extends State<SearchScreen>
   bool _isNewestFirst = true;
   late AnimationController _staggerController;
 
+  // ── Filtres ───────────────────────────────────────────────────────────────
+  static const String _activeFiltersKey = 'active_filters';
+  FilterState _activeFilters = FilterState.empty;
+  final Set<String> _readIds = {}; // cache pour le filtre Statut (Plan 4 le remplira)
+
   @override
   void initState() {
     super.initState();
@@ -31,6 +102,7 @@ class _SearchScreenState extends State<SearchScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
+    _loadPersistedFilters();
     if (widget.initialQuery.isNotEmpty) {
       _searchController.text = widget.initialQuery;
       _performSearch(widget.initialQuery);
@@ -45,6 +117,100 @@ class _SearchScreenState extends State<SearchScreen>
     super.dispose();
   }
 
+  // ── Persistance filtres ───────────────────────────────────────────────────
+
+  Future<void> _loadPersistedFilters() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_activeFiltersKey);
+    if (raw != null && mounted) {
+      try {
+        final json = jsonDecode(raw) as Map<String, dynamic>;
+        setState(() => _activeFilters = FilterState.fromJson(json));
+      } catch (_) {
+        // Filtre corrompu — ignorer et repartir avec l'état vide (T-1-13)
+      }
+    }
+  }
+
+  Future<void> _applyFiltersAndSearch() async {
+    final query = _searchController.text.trim().replaceAll('"', '');
+    if (query.isEmpty && !_activeFilters.hasActiveFilters) return;
+
+    // Persister les filtres actifs (per CONTEXT.md locked decision)
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_activeFiltersKey, jsonEncode(_activeFilters.toJson()));
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _hasSearched = true;
+    });
+    try {
+      final result = await RappelService.fetchRappels(
+        categoryKey: 'all',
+        searchQuery: query,
+        dateFrom: _activeFilters.apiDateFrom,
+        dateTo: _activeFilters.apiDateTo,
+        newestFirst: _isNewestFirst,
+      );
+      if (!mounted) return;
+      if (result.containsKey('error')) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = result['error'];
+        });
+        return;
+      }
+      var results = List<dynamic>.from(result['results'] ?? []);
+      // Filtres client-side
+      results = SearchScreen.applyRiskFilter(_activeFilters.riskLevels, results);
+      results = SearchScreen.applyBrandFilter(_activeFilters.brandKeyword, results);
+      results =
+          SearchScreen.applyReadFilter(_activeFilters.readFilter, results, _readIds);
+      setState(() {
+        _allResults = List<dynamic>.from(result['results'] ?? []);
+        _filteredResults = results;
+        _hasSearched = true;
+        _isLoading = false;
+      });
+      _staggerController.forward(from: 0);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            'Impossible de charger les résultats. Vérifiez votre connexion et réessayez.';
+      });
+    }
+  }
+
+  // ── Panel de filtres ──────────────────────────────────────────────────────
+
+  void _openFilterPanel() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => FilterPanel(
+        initialState: _activeFilters,
+        onApply: (newState) {
+          setState(() => _activeFilters = newState);
+          _applyFiltersAndSearch();
+        },
+        onReset: () async {
+          setState(() => _activeFilters = FilterState.empty);
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove(_activeFiltersKey);
+          if (_searchController.text.isNotEmpty) {
+            _performSearch(_searchController.text);
+          }
+        },
+      ),
+    );
+  }
+
+  // ── Recherche principale ──────────────────────────────────────────────────
+
   Future<void> _performSearch(String query) async {
     final q = query.trim().replaceAll('"', ''); // sanitize avant injection URL (T-1-01)
     if (q.isEmpty) return;
@@ -57,6 +223,8 @@ class _SearchScreenState extends State<SearchScreen>
       final result = await RappelService.fetchRappels(
         categoryKey: 'all',
         searchQuery: q,
+        dateFrom: _activeFilters.apiDateFrom,
+        dateTo: _activeFilters.apiDateTo,
         newestFirst: _isNewestFirst,
       );
       if (!mounted) return;
@@ -67,10 +235,15 @@ class _SearchScreenState extends State<SearchScreen>
         });
         return;
       }
-      final results = List<dynamic>.from(result['results'] ?? []);
+      var results = List<dynamic>.from(result['results'] ?? []);
+      // Filtres client-side
+      results = SearchScreen.applyRiskFilter(_activeFilters.riskLevels, results);
+      results = SearchScreen.applyBrandFilter(_activeFilters.brandKeyword, results);
+      results =
+          SearchScreen.applyReadFilter(_activeFilters.readFilter, results, _readIds);
       setState(() {
-        _allResults = results;
-        _filteredResults = List.from(results);
+        _allResults = List<dynamic>.from(result['results'] ?? []);
+        _filteredResults = results;
         _isLoading = false;
       });
       _staggerController.forward(from: 0);
@@ -101,6 +274,82 @@ class _SearchScreenState extends State<SearchScreen>
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => RappelDetailsPage(rappel: rappel)),
+    );
+  }
+
+  // ── Chips actifs ──────────────────────────────────────────────────────────
+
+  List<Widget> _buildActiveFilterChips() {
+    final cs = Theme.of(context).colorScheme;
+    final chips = <Widget>[];
+
+    for (final level in _activeFilters.riskLevels) {
+      final label = level == 'grave'
+          ? 'Grave'
+          : level == 'modéré'
+              ? 'Modéré'
+              : 'Faible';
+      chips.add(_activeChip(label, cs, onRemove: () {
+        final newLevels = Set<String>.from(_activeFilters.riskLevels)
+          ..remove(level);
+        setState(() => _activeFilters = _activeFilters.copyWith(riskLevels: newLevels));
+        _applyFiltersAndSearch();
+      }));
+    }
+
+    if (_activeFilters.customDateRange != null) {
+      final r = _activeFilters.customDateRange!;
+      final label =
+          '${r.start.day.toString().padLeft(2, '0')}/${r.start.month.toString().padLeft(2, '0')} – '
+          '${r.end.day.toString().padLeft(2, '0')}/${r.end.month.toString().padLeft(2, '0')}';
+      chips.add(_activeChip(label, cs, onRemove: () {
+        setState(() => _activeFilters =
+            _activeFilters.copyWith(clearCustomDateRange: true));
+        _applyFiltersAndSearch();
+      }));
+    } else if (_activeFilters.dateDays != null) {
+      chips.add(_activeChip('${_activeFilters.dateDays} jours', cs, onRemove: () {
+        setState(() =>
+            _activeFilters = _activeFilters.copyWith(clearDateDays: true));
+        _applyFiltersAndSearch();
+      }));
+    }
+
+    if (_activeFilters.brandKeyword.isNotEmpty) {
+      chips.add(_activeChip(_activeFilters.brandKeyword, cs, onRemove: () {
+        setState(() =>
+            _activeFilters = _activeFilters.copyWith(brandKeyword: ''));
+        _applyFiltersAndSearch();
+      }));
+    }
+
+    if (_activeFilters.readFilter != 'all') {
+      final label =
+          _activeFilters.readFilter == 'unread' ? 'Non lus' : 'Lus';
+      chips.add(_activeChip(label, cs, onRemove: () {
+        setState(() =>
+            _activeFilters = _activeFilters.copyWith(readFilter: 'all'));
+        _applyFiltersAndSearch();
+      }));
+    }
+
+    return chips;
+  }
+
+  Widget _activeChip(String label, ColorScheme cs,
+      {required VoidCallback onRemove}) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Chip(
+        label: Text(label, style: const TextStyle(fontSize: 12)),
+        deleteIcon: const Icon(Icons.close, size: 14),
+        onDeleted: onRemove,
+        backgroundColor: cs.primaryContainer,
+        labelStyle: TextStyle(color: cs.onPrimaryContainer),
+        deleteIconColor: cs.onPrimaryContainer,
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+      ),
     );
   }
 
@@ -262,15 +511,15 @@ class _SearchScreenState extends State<SearchScreen>
         (rappel['marque_produit'] ?? rappel['nom_marque'] ?? '').toString();
     final categorie = (rappel['categorie_produit'] ?? '').toString();
     // Champ correct selon RESEARCH.md Pitfall 4 — vérification live API 2026-06-16
-    final risque = rappel['risques_encourus']?.toString()
-        ?? rappel['risque_produit']?.toString();
+    final risque = rappel['risques_encourus']?.toString() ??
+        rappel['risque_produit']?.toString();
     final imageUrl = _extractFirstImageUrl(rappel);
     final cs = Theme.of(context).colorScheme;
 
     DateTime? parsedDate;
     bool isNew = false;
     // isRead — Plan 4: connecter à ReadStatusService.isRead(rappelId)
-    // Plan 1: hardcodé false → semantics label inclut toujours ', non lu'
+    // Plan 1-2: hardcodé false → semantics label inclut toujours ', non lu'
     String timeLabel = '';
     if (rappel['date_publication'] != null) {
       try {
@@ -567,7 +816,27 @@ class _SearchScreenState extends State<SearchScreen>
                   });
                 },
               ),
-            // TODO(Plan2): IconButton(Icons.tune) → FilterPanel
+            // Bouton filtres avec badge point bleu si filtres actifs
+            Stack(children: [
+              IconButton(
+                icon: const Icon(Icons.tune),
+                tooltip: 'Filtres',
+                onPressed: _openFilterPanel,
+              ),
+              if (_activeFilters.hasActiveFilters)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: cs.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ]),
           ],
           onChanged: (_) => setState(() {}), // rebuild pour afficher/masquer clear
           onSubmitted: _performSearch,
@@ -680,8 +949,6 @@ class _SearchScreenState extends State<SearchScreen>
 
   Widget _buildResultsList(ColorScheme cs) {
     final count = _filteredResults.length;
-    // _allResults.length sera utilisé en Plan 2 pour afficher "X / Y résultats"
-    // quand des filtres client-side sont actifs.
     final total = _allResults.length;
     final label = count == total
         ? (count == 1 ? '1 résultat' : '$count résultats')
@@ -725,6 +992,15 @@ class _SearchScreenState extends State<SearchScreen>
             ],
           ),
         ),
+        // Chips actifs sous la SearchBar (si filtres actifs)
+        if (_activeFilters.hasActiveFilters)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: _buildActiveFilterChips()),
+            ),
+          ),
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.only(bottom: 80),
