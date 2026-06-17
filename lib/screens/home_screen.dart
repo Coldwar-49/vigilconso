@@ -7,6 +7,7 @@ import 'package:vigiconso/services/alerts_notifier.dart';
 import 'package:vigiconso/screens/barcode_scanner.dart';
 import 'package:vigiconso/screens/categories_screen.dart';
 import 'package:vigiconso/screens/rappel_screen.dart';
+import 'package:vigiconso/screens/search_screen.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
 import 'package:vigiconso/services/subscribe_to_newsletter.dart' show NotificationService;
 import 'package:vigiconso/services/rappel_service.dart';
@@ -125,13 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.clear();
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => RappelListScreen(
-          categoryKey: 'all',
-          categoryTitle: 'Résultats : "$q"',
-          initialSearch: q,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => SearchScreen(initialQuery: q)),
     );
   }
 
