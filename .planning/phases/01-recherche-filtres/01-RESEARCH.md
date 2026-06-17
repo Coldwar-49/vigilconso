@@ -406,22 +406,16 @@ if (range != null) {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Statut lu/non-lu : quel identifiant unique ?**
-   - Ce que l'on sait : `reference_fiche` existe dans les résultats API (vu dans les données live), mais peut être `null` pour certains enregistrements anciens
-   - Ce qui est flou : `FavoritesService` utilise `reference_fiche ?? libelle` comme fallback — devrait-on faire pareil pour `ReadStatusService` ?
-   - Recommandation : Oui, utiliser la même logique `reference_fiche ?? libelle ?? numero_fiche` pour cohérence
+   - RESOLVED: Utiliser `reference_fiche ?? libelle ?? numero_fiche` pour cohérence avec `FavoritesService`. Implémenté dans `ReadStatusService.getRappelId()` (Plan 04).
 
 2. **Persistance des filtres entre sessions ?**
-   - Ce que l'on sait : Le roadmap mentionne "persistance" pour les filtres
-   - Ce qui est flou : S'agit-il de persister entre sessions (SharedPrefs) ou seulement dans la session courante (setState) ?
-   - Recommandation : Persister uniquement dans la session (setState) pour Phase 1 — la persistance cross-session des filtres est une complexité ajoutée non critique
+   - RESOLVED: Persistance via SharedPreferences (`active_filters`) — décision utilisateur (CONTEXT.md) prime sur la recommandation de recherche session-only. La décision locked CONTEXT.md stipule explicitement "Persistance : oui — filtres actifs sauvegardés via SharedPreferences". Implémenté dans Plan 02 avec `FilterState.toJson/fromJson` et clé `active_filters`.
 
 3. **Autocomplétion : API live ou cache local ?**
-   - Ce que l'on sait : L'appel API de suggestion prend ~300-500ms sur bonne connexion
-   - Ce qui est flou : Faut-il pré-charger les marques populaires au démarrage pour un mode offline partiel ?
-   - Recommandation : Appel API live uniquement pour Phase 1 (pas de pré-chargement) — les suggestions dégradent gracieusement si hors ligne (pas de suggestions = pas d'erreur)
+   - RESOLVED: Appel API live uniquement pour Phase 1 via `RappelService.fetchSuggestions()` — les suggestions dégradent gracieusement si hors ligne (retourne `[]` sans exception). Implémenté dans Plan 03.
 
 ---
 
