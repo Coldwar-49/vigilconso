@@ -20,9 +20,12 @@ class RappelService {
 
   /// Récupère les rappels pour une catégorie donnée.
   /// [forceRefresh] : force un appel API même si le cache est récent.
+  /// [dateFrom] / [dateTo] : filtres optionnels au format 'YYYY-MM-DD'.
   static Future<Map<String, dynamic>> fetchRappels({
     required String categoryKey,
     String searchQuery = '',
+    String? dateFrom,
+    String? dateTo,
     int limit = 100,
     bool newestFirst = true,
     bool forceRefresh = false,
@@ -60,6 +63,14 @@ class RappelService {
         );
       }
 
+      // Filtres de date optionnels (s'ajoutent aux filtres existants)
+      if (dateFrom != null) {
+        filters.add('date_publication >= "$dateFrom"');
+      }
+      if (dateTo != null) {
+        filters.add('date_publication <= "$dateTo"');
+      }
+
       String apiUrl = '${AppConstants.apiBaseUrl}/records?limit=$limit';
       if (filters.isNotEmpty) {
         apiUrl += '&where=${Uri.encodeQueryComponent(filters.join(" AND "))}';
@@ -74,8 +85,8 @@ class RappelService {
 
         // Tri local (API ignore sort=-date_publication)
         results.sort((a, b) {
-          final dateA = _parseDate(a['date_publication'] ?? '');
-          final dateB = _parseDate(b['date_publication'] ?? '');
+          final dateA = parseDate(a['date_publication'] ?? '');
+          final dateB = parseDate(b['date_publication'] ?? '');
           if (dateA == null && dateB == null) return 0;
           if (dateA == null) return 1;
           if (dateB == null) return -1;
@@ -147,8 +158,8 @@ class RappelService {
 
         // Tri local en secours si order_by est ignoré par l'API
         results.sort((a, b) {
-          final dateA = _parseDate(a['date_publication'] ?? '');
-          final dateB = _parseDate(b['date_publication'] ?? '');
+          final dateA = parseDate(a['date_publication'] ?? '');
+          final dateB = parseDate(b['date_publication'] ?? '');
           if (dateA == null && dateB == null) return 0;
           if (dateA == null) return 1;
           if (dateB == null) return -1;
@@ -163,8 +174,9 @@ class RappelService {
     return [];
   }
 
-  /// Parse une date au format ISO (yyyy-MM-dd) ou dd/MM/yyyy
-  static DateTime? _parseDate(String dateStr) {
+  /// Parse une date au format ISO (yyyy-MM-dd) ou dd/MM/yyyy.
+  /// Méthode publique — utilisée par SearchScreen et rappel_screen.dart.
+  static DateTime? parseDate(String dateStr) {
     if (dateStr.isEmpty) return null;
     try {
       return DateTime.parse(dateStr);

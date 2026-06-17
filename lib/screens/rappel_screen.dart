@@ -1,8 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:vigiconso/screens/rappel_details_page.dart';
+import 'package:vigiconso/services/rappel_service.dart';
 import 'package:vigiconso/utils/constants.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
 
@@ -47,55 +46,16 @@ class _RappelListScreenState extends State<RappelListScreen>
     if (widget.initialSearch.isNotEmpty) {
       _searchQuery = widget.initialSearch;
       _searchController.text = widget.initialSearch;
-      _searchRappels();
-    } else {
-      _fetchRappels();
     }
-  }
-
-  DateTime? _parseDate(String dateStr) {
-    if (dateStr.isEmpty) return null;
-    try {
-      return DateTime.parse(dateStr);
-    } catch (_) {}
-    try {
-      final parts = dateStr.split('/');
-      if (parts.length == 3) {
-        final jour = int.tryParse(parts[0].trim()) ?? 1;
-        final mois = int.tryParse(parts[1].trim()) ?? 1;
-        final annee = int.tryParse(parts[2].trim()) ?? 2000;
-        if (annee >= 2000 && annee <= 2100) {
-          return DateTime(annee, mois, jour);
-        }
-      }
-    } catch (_) {}
-    try {
-      final match = RegExp(r'(\d{4})').firstMatch(dateStr);
-      if (match != null) {
-        final annee = int.parse(match.group(1)!);
-        if (annee >= 2000 && annee <= 2100) {
-          return DateTime(annee, 1, 1);
-        }
-      }
-    } catch (_) {}
-    for (int annee = 2020; annee <= 2030; annee++) {
-      if (dateStr.contains(annee.toString())) {
-        return DateTime(annee, 1, 1);
-      }
-    }
-    return null;
+    _loadRappels();
   }
 
   void _toggleSortOrder() {
     setState(() {
       _isNewestFirst = !_isNewestFirst;
       _rappels.sort((a, b) {
-        final String dateStrA = a['date_publication'] ?? '';
-        final String dateStrB = b['date_publication'] ?? '';
-        DateTime? dateA = _parseDate(dateStrA);
-        DateTime? dateB = _parseDate(dateStrB);
-        dateA ??= DateTime(1900);
-        dateB ??= DateTime(1900);
+        final dateA = RappelService.parseDate(a['date_publication'] ?? '') ?? DateTime(1900);
+        final dateB = RappelService.parseDate(b['date_publication'] ?? '') ?? DateTime(1900);
         return _isNewestFirst ? dateB.compareTo(dateA) : dateA.compareTo(dateB);
       });
       _applyYearFilter();
@@ -109,140 +69,30 @@ class _RappelListScreenState extends State<RappelListScreen>
     });
   }
 
-  Future<void> _fetchRappels() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
+  Future<void> _loadRappels() async {
+    setState(() { _isLoading = true; _errorMessage = null; });
     try {
-      // Filtre date pour obtenir des données récentes.
-      // L'API ignore sort ET interdit offset+limit > 10000 → on filtre par date.
-      final year = DateTime.now().year - 1;
-      final List<String> filters = ['date_publication >= "$year-01-01"'];
-
-      final categoryFilter = AppConstants.getCategoryFilter(widget.categoryKey);
-      if (categoryFilter.isNotEmpty) {
-        filters.add('($categoryFilter)');
+      final result = await RappelService.fetchRappels(
+        categoryKey: widget.categoryKey,
+        searchQuery: _searchQuery,
+        newestFirst: _isNewestFirst,
+      );
+      if (!mounted) return;
+      if (result.containsKey('error')) {
+        setState(() { _isLoading = false; _errorMessage = result['error']; });
+        return;
       }
-
-      final apiUrl = '${AppConstants.apiBaseUrl}/records?limit=100'
-          '&where=${Uri.encodeQueryComponent(filters.join(" AND "))}';
-
-      final response = await http
-          .get(Uri.parse(apiUrl))
-          .timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['results'] != null) {
-          final List<dynamic> results = List<dynamic>.from(data['results']);
-
-          // Tri local (API ignore sort=-date_publication)
-          results.sort((a, b) {
-            DateTime? dateA = _parseDate(a['date_publication'] ?? '');
-            DateTime? dateB = _parseDate(b['date_publication'] ?? '');
-            dateA ??= DateTime(1900);
-            dateB ??= DateTime(1900);
-            return _isNewestFirst
-                ? dateB.compareTo(dateA)
-                : dateA.compareTo(dateB);
-          });
-
-          setState(() {
-            _rappels = results;
-            _isLoading = false;
-            _currentPage = 0;
-            _applyYearFilter();
-          });
-          _staggerController.forward(from: 0);
-        } else {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = 'Aucun résultat trouvé dans la réponse API';
-          });
-        }
-      } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage =
-              'Erreur lors de la récupération des données: ${response.statusCode}';
-        });
-      }
-    } catch (e) {
+      final results = List<dynamic>.from(result['results'] ?? []);
       setState(() {
+        _rappels = results;
+        _filteredRappels = List.from(results);
         _isLoading = false;
-        _errorMessage = 'Erreur: $e';
+        _currentPage = 0;
       });
-    }
-  }
-
-  Future<void> _searchRappels() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // Pour la recherche : on filtre sur tout le dataset sans offset
-      // (la recherche textuelle est plus importante que le tri par date)
-      String apiUrl = '${AppConstants.apiBaseUrl}/records?limit=100';
-
-      final List<String> filters = [];
-
-      final catFilter = AppConstants.getCategoryFilter(widget.categoryKey);
-      if (catFilter.isNotEmpty) filters.add('($catFilter)');
-
-      if (_searchQuery.isNotEmpty) {
-        final query = _searchQuery.replaceAll('"', '');
-        filters.add(
-          '(libelle like "%$query%" or libelle_produit like "%$query%" or '
-          'nom_marque like "%$query%" or modeles_ou_references like "%$query%")',
-        );
-      }
-
-      if (filters.isNotEmpty) {
-        apiUrl += '&where=${Uri.encodeQueryComponent(filters.join(" AND "))}';
-      }
-
-      final response = await http
-          .get(Uri.parse(apiUrl))
-          .timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        List<dynamic> results = data['results'] ?? [];
-
-        results.sort((a, b) {
-          final String dateStrA = a['date_publication'] ?? '';
-          final String dateStrB = b['date_publication'] ?? '';
-          DateTime? dateA = _parseDate(dateStrA);
-          DateTime? dateB = _parseDate(dateStrB);
-          dateA ??= DateTime(1900);
-          dateB ??= DateTime(1900);
-          return _isNewestFirst
-              ? dateB.compareTo(dateA)
-              : dateA.compareTo(dateB);
-        });
-
-        setState(() {
-          _rappels = results;
-          _isLoading = false;
-          _currentPage = 0;
-          _applyYearFilter();
-        });
-        _staggerController.forward(from: 0);
-      } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Erreur lors de la recherche: ${response.statusCode}';
-        });
-      }
+      _staggerController.forward(from: 0);
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Erreur: $e';
-      });
+      if (!mounted) return;
+      setState(() { _isLoading = false; _errorMessage = 'Erreur: $e'; });
     }
   }
 
@@ -397,7 +247,7 @@ class _RappelListScreenState extends State<RappelListScreen>
     final title = rappel['libelle'] ?? rappel['libelle_produit'] ?? 'Produit sans nom';
     final brand = (rappel['marque_produit'] ?? rappel['nom_marque'] ?? '').toString();
     final categorie = (rappel['categorie_produit'] ?? '').toString();
-    final risque = rappel['risques_encourus_par_le_consommateur']?.toString()
+    final risque = rappel['risques_encourus']?.toString()
         ?? rappel['risque_produit']?.toString();
     final imageUrl = _extractFirstImageUrl(rappel);
     final cs = Theme.of(context).colorScheme;
@@ -407,7 +257,7 @@ class _RappelListScreenState extends State<RappelListScreen>
     String timeLabel = '';
     if (rappel['date_publication'] != null) {
       try {
-        parsedDate = _parseDate(rappel['date_publication'].toString());
+        parsedDate = RappelService.parseDate(rappel['date_publication'].toString());
         if (parsedDate != null) {
           timeLabel = _timeAgo(parsedDate);
           isNew = DateTime.now().difference(parsedDate).inDays <= 7;
@@ -618,16 +468,16 @@ class _RappelListScreenState extends State<RappelListScreen>
                     onPressed: () {
                       _searchController.clear();
                       setState(() => _searchQuery = '');
-                      _fetchRappels();
+                      _loadRappels();
                     },
                   ),
                 FilledButton(
-                  onPressed: _searchRappels,
+                  onPressed: _loadRappels,
                   child: const Text('OK'),
                 ),
               ],
               onChanged: (value) => setState(() => _searchQuery = value),
-              onSubmitted: (_) => _searchRappels(),
+              onSubmitted: (_) => _loadRappels(),
             ),
           ),
 
@@ -703,7 +553,7 @@ class _RappelListScreenState extends State<RappelListScreen>
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _fetchRappels,
+        onPressed: _loadRappels,
         icon: const Icon(Icons.refresh),
         label: const Text('Actualiser'),
       ),
@@ -740,7 +590,7 @@ class _RappelListScreenState extends State<RappelListScreen>
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
-              onPressed: _fetchRappels,
+              onPressed: _loadRappels,
               icon: const Icon(Icons.refresh),
               label: const Text('Réessayer'),
             ),
@@ -779,7 +629,7 @@ class _RappelListScreenState extends State<RappelListScreen>
             ),
             const SizedBox(height: 24),
             OutlinedButton.icon(
-              onPressed: _fetchRappels,
+              onPressed: _loadRappels,
               icon: const Icon(Icons.refresh),
               label: const Text('Rafraîchir'),
             ),
