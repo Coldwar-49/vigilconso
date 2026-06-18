@@ -9,7 +9,7 @@
 
 | # | Phase | Goal | Requirements | Success Criteria |
 |---|-------|------|--------------|-----------------|
-| 1 | Recherche & Filtres | L'utilisateur peut trouver n'importe quel rappel en quelques secondes | SRCH-01 à SRCH-08, UX-01 | 5 |
+| 1 | ~~Recherche & Filtres~~ ✅ | L'utilisateur peut trouver n'importe quel rappel en quelques secondes | SRCH-01 à SRCH-08, UX-01 | 5/5 ✅ |
 | 2 | Refactoring & Qualité Technique | Code propre, typé, sans duplications, architecture Riverpod | TECH-01 à TECH-10, UX-02 à UX-04 | 4 |
 | 3 | Alertes Personnalisées | L'utilisateur est notifié automatiquement pour ses marques/catégories suivies | ALRT-01 à ALRT-05, UX-05 | 4 |
 | 4 | Mode Offline | L'app fonctionne sans connexion avec données récentes synchronisées | OFFL-01 à OFFL-04 | 4 |
@@ -46,11 +46,13 @@
 
 **Plans:** 4 plans
 
+**Status:** ✅ Complete (2026-06-18) | Verification: human_needed (5/5 implemented, device testing pending)
+
 Plans:
-- [ ] 01-01-PLAN.md — Recherche globale + SearchScreen (correction bypass cache, wave 1)
-- [ ] 01-02-PLAN.md — FilterPanel (filtres avancés + tri, wave 2)
-- [ ] 01-03-PLAN.md — Historique + autocomplétion (wave 2, parallèle avec Plan 2)
-- [ ] 01-04-PLAN.md — Statut lu/non-lu (badge NON LU + persistance, wave 2, parallèle)
+- [x] 01-01-PLAN.md — Recherche globale + SearchScreen (correction bypass cache, wave 1)
+- [x] 01-02-PLAN.md — FilterPanel (filtres avancés + tri, wave 2)
+- [x] 01-03-PLAN.md — Historique + autocomplétion (wave 2, parallèle avec Plan 2)
+- [x] 01-04-PLAN.md — Statut lu/non-lu (badge NON LU + persistance, wave 2, parallèle)
 
 ---
 

@@ -1,3 +1,17 @@
+---
+gsd_state_version: 1.0
+milestone: v2.0
+milestone_name: milestone
+status: in_progress
+last_updated: "2026-06-18T00:00:00Z"
+progress:
+  total_phases: 6
+  completed_phases: 1
+  total_plans: 4
+  completed_plans: 4
+  percent: 17
+---
+
 # Project State: VigilConso v2.0
 
 ## Project Reference
@@ -5,26 +19,32 @@
 See: `.planning/PROJECT.md` (updated 2026-06-16)
 
 **Core value:** Permettre à tout consommateur français d'être alerté rapidement quand un produit qu'il utilise fait l'objet d'un rappel.
-**Current focus:** Phase 1 — Recherche & Filtres
+**Current focus:** Phase 2 — Refactoring & Qualité Technique
 
 ## Current Status
 
-**Active Phase:** Phase 1 — Recherche & Filtres
-**Phase Goal:** L'utilisateur peut trouver n'importe quel rappel en quelques secondes
+**Active Phase:** Phase 2 — Refactoring & Qualité Technique
+**Phase Goal:** Codebase propre — modèle typé, architecture Riverpod, zéro duplication, bugs critiques corrigés.
 
 **What's done:**
+
 - [x] PROJECT.md initialisé
 - [x] config.json configuré (YOLO, standard, parallel, balanced)
 - [x] REQUIREMENTS.md défini (38 requirements v1)
 - [x] ROADMAP.md créé (6 phases)
-- [x] UX-01: Cartes Google News livrées (`rappel_screen.dart`)
+- [x] Phase 1 — Recherche & Filtres COMPLETE (4/4 plans, 35/35 tests, human UAT pending)
+  - SearchScreen + RappelService refactorisé
+  - FilterPanel + persistance filtres (19 tests)
+  - SearchHistoryService + autocomplétion (6 tests)
+  - ReadStatusService + badge NON LU (10 tests)
 
 **What's next:**
-- Phase 1 — Plans à exécuter :
-  1. Recherche globale multi-catégorie + écran de recherche dédié
-  2. Filtres avancés (panel, chips, persistance)
-  3. Historique de recherche + suggestions
-  4. Statut lu/non-lu
+
+- Phase 2 — **Discuss → Plan → Execute**
+  - TECH-01: Modèle `Rappel` typé avec `fromJson`
+  - TECH-02: Migration Riverpod (providers pour services)
+  - TECH-03 à TECH-10: Extractions utilitaires + bugs critiques
+  - UX-02 à UX-04: Page de détail enrichie + navigation + shimmer
 
 ## Workflow
 
@@ -39,8 +59,8 @@ See: `.planning/PROJECT.md` (updated 2026-06-16)
 
 | Phase | Status | Completed |
 |-------|--------|-----------|
-| 1 — Recherche & Filtres | 🟡 In Progress | — |
-| 2 — Refactoring & Qualité | ⬜ Pending | — |
+| 1 — Recherche & Filtres | ✅ Complete | 2026-06-18 |
+| 2 — Refactoring & Qualité | 🟡 Next | — |
 | 3 — Alertes Personnalisées | ⬜ Pending | — |
 | 4 — Mode Offline | ⬜ Pending | — |
 | 5 — Widget Home Screen | ⬜ Pending | — |
