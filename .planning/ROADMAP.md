@@ -83,11 +83,13 @@ Plans:
 3. Le barcode scanner retourne des résultats via l'API v2.1 (test avec un EAN existant)
 4. Le formulaire de contact envoie réellement un email (vérifiable dans le backend)
 
-**Plans:**
-1. Modèle `Rappel` + `RappelService` refactorisé avec Riverpod
-2. Extraction utilitaires (`image_utils`, `date_utils`) + nettoyage duplications
-3. Corrections bugs critiques (barcode v2.1, contact form, OneSignal dart-define, race condition, caméra)
-4. Page de détail enrichie + navigation + shimmer homogène
+**Plans:** 4 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Rappel model (fromJson) + image_utils + date_utils + Wave 0 test stubs (wave 1)
+- [ ] 02-02-PLAN.md — Riverpod providers + ProviderScope + screen migration + navigation (wave 2)
+- [ ] 02-03-PLAN.md — Bug fixes: barcode v2.1, contact form /contact, Lock race condition, camera lifecycle (wave 2, parallèle avec Plan 02)
+- [ ] 02-04-PLAN.md — Page de détail enrichie (dates, lots, action bar sticky) + shimmer homogène (wave 3)
 
 ---
 
@@ -216,3 +218,4 @@ Phase 1 et Phase 2 peuvent être lancées en parallèle si nécessaire (elles to
 
 *Roadmap created: 2026-06-16*
 *Plans Phase 1 created: 2026-06-17*
+*Plans Phase 2 created: 2026-06-18*
