@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vigiconso/screens/rappel_details_page.dart';
 import 'package:vigiconso/services/rappel_service.dart';
+import 'package:vigiconso/services/search_history_service.dart';
 import 'package:vigiconso/widgets/filter_panel.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -93,7 +94,17 @@ class _SearchScreenState extends State<SearchScreen>
   // ── Filtres ───────────────────────────────────────────────────────────────
   static const String _activeFiltersKey = 'active_filters';
   FilterState _activeFilters = FilterState.empty;
-  final Set<String> _readIds = {}; // cache pour le filtre Statut (Plan 4 le remplira)
+  // ignore: prefer_final_fields — Plan 4 reassigns via setState(() => _readIds = ids)
+  Set<String> _readIds = {};
+
+  // ── Historique + autocomplétion ───────────────────────────────────────────
+  Timer? _debounce;
+  List<String> _suggestions = [];
+  bool _isFetchingSuggestions = false;
+  List<String> _searchHistory = [];
+  bool _showingHistory = false;
+  bool _confirmingClearHistory = false;
+  Timer? _clearConfirmTimer;
 
   @override
   void initState() {
@@ -103,6 +114,12 @@ class _SearchScreenState extends State<SearchScreen>
       duration: const Duration(milliseconds: 600),
     );
     _loadPersistedFilters();
+    _loadHistory();
+    _searchFocusNode.addListener(() {
+      if (_searchFocusNode.hasFocus && _searchController.text.isEmpty) {
+        setState(() => _showingHistory = true);
+      }
+    });
     if (widget.initialQuery.isNotEmpty) {
       _searchController.text = widget.initialQuery;
       _performSearch(widget.initialQuery);
@@ -111,6 +128,8 @@ class _SearchScreenState extends State<SearchScreen>
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    _clearConfirmTimer?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
     _staggerController.dispose();
@@ -130,6 +149,36 @@ class _SearchScreenState extends State<SearchScreen>
         // Filtre corrompu — ignorer et repartir avec l'état vide (T-1-13)
       }
     }
+  }
+
+  Future<void> _loadHistory() async {
+    final history = await SearchHistoryService.getHistory();
+    if (mounted) setState(() => _searchHistory = history);
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    if (value.length < 2) {
+      setState(() {
+        _suggestions = [];
+        _showingHistory = value.isEmpty;
+      });
+      return;
+    }
+    setState(() => _showingHistory = false);
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      _fetchSuggestions(value);
+    });
+  }
+
+  Future<void> _fetchSuggestions(String prefix) async {
+    setState(() => _isFetchingSuggestions = true);
+    final results = await RappelService.fetchSuggestions(prefix);
+    if (!mounted) return;
+    setState(() {
+      _suggestions = results;
+      _isFetchingSuggestions = false;
+    });
   }
 
   Future<void> _applyFiltersAndSearch() async {
@@ -214,7 +263,12 @@ class _SearchScreenState extends State<SearchScreen>
   Future<void> _performSearch(String query) async {
     final q = query.trim().replaceAll('"', ''); // sanitize avant injection URL (T-1-01)
     if (q.isEmpty) return;
+
+    await SearchHistoryService.addToHistory(q);
+    _loadHistory();
     setState(() {
+      _suggestions = [];
+      _showingHistory = false;
       _isLoading = true;
       _errorMessage = null;
       _hasSearched = true;
@@ -838,7 +892,10 @@ class _SearchScreenState extends State<SearchScreen>
                 ),
             ]),
           ],
-          onChanged: (_) => setState(() {}), // rebuild pour afficher/masquer clear
+          onChanged: (value) {
+            setState(() {}); // rebuild pour clear button
+            _onSearchChanged(value);
+          },
           onSubmitted: _performSearch,
         ),
         automaticallyImplyLeading: true,
@@ -848,9 +905,46 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Widget _buildBody(ColorScheme cs) {
+    final mainContent = _resolveMainContent(cs);
+    if (_suggestions.isEmpty && !_isFetchingSuggestions) return mainContent;
+
+    return Stack(children: [
+      mainContent,
+      Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: Material(
+          elevation: 4,
+          child: Container(
+            constraints: const BoxConstraints(maxHeight: 320),
+            color: cs.surface,
+            child: _isFetchingSuggestions
+                ? const LinearProgressIndicator()
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _suggestions.length,
+                    itemBuilder: (_, i) => ListTile(
+                      leading: const Icon(Icons.search),
+                      title:
+                          Text(_suggestions[i], style: const TextStyle(fontSize: 14)),
+                      onTap: () {
+                        _searchController.text = _suggestions[i];
+                        _performSearch(_suggestions[i]);
+                        setState(() => _suggestions = []);
+                      },
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _resolveMainContent(ColorScheme cs) {
     if (_isLoading) return _buildShimmerList();
     if (_errorMessage != null) return _buildErrorState(cs);
-    if (!_hasSearched) return _buildIdleState(cs);
+    if (!_hasSearched || _showingHistory) return _buildIdleState(cs);
     if (_filteredResults.isEmpty) return _buildEmptyState(cs);
     return _buildResultsList(cs);
   }
@@ -864,23 +958,100 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Widget _buildIdleState(ColorScheme cs) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search,
-            size: 64,
-            color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+    if (_searchHistory.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.history, size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+            const SizedBox(height: 16),
+            Text('Aucune recherche récente',
+                style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 4),
+            Text('Vos recherches apparaîtront ici.',
+                style: TextStyle(
+                    fontSize: 12, color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
+                textAlign: TextAlign.center),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+          child: Row(children: [
+            Icon(Icons.history, size: 16, color: cs.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Expanded(
+                child: Text('Recherches récentes',
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: cs.onSurfaceVariant,
+                        fontWeight: FontWeight.w500))),
+            _confirmingClearHistory
+                ? Row(mainAxisSize: MainAxisSize.min, children: [
+                    TextButton(
+                      onPressed: () async {
+                        _clearConfirmTimer?.cancel();
+                        await SearchHistoryService.clearHistory();
+                        if (mounted) {
+                          setState(() {
+                            _searchHistory = [];
+                            _confirmingClearHistory = false;
+                          });
+                        }
+                      },
+                      child: Text('Confirmer ?',
+                          style: TextStyle(color: cs.error, fontSize: 12)),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        _clearConfirmTimer?.cancel();
+                        setState(() => _confirmingClearHistory = false);
+                      },
+                      child: const Text('Annuler', style: TextStyle(fontSize: 12)),
+                    ),
+                  ])
+                : TextButton(
+                    onPressed: () {
+                      setState(() => _confirmingClearHistory = true);
+                      _clearConfirmTimer = Timer(const Duration(seconds: 3), () {
+                        if (mounted) setState(() => _confirmingClearHistory = false);
+                      });
+                    },
+                    child: const Text("Effacer l'historique",
+                        style: TextStyle(fontSize: 12)),
+                  ),
+          ]),
+        ),
+        Expanded(
+          child: ListView.builder(
+            itemCount: _searchHistory.length,
+            itemBuilder: (_, i) {
+              final query = _searchHistory[i];
+              return ListTile(
+                leading: Icon(Icons.history, color: cs.onSurfaceVariant),
+                title: Text(query, style: const TextStyle(fontSize: 15)),
+                trailing: IconButton(
+                  icon: Icon(Icons.north_west, size: 16, color: cs.onSurfaceVariant),
+                  tooltip: 'Copier dans la recherche',
+                  onPressed: () {
+                    _searchController.text = query;
+                    _searchController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: query.length));
+                    setState(() {});
+                  },
+                ),
+                onTap: () => _performSearch(query),
+              );
+            },
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Rechercher un produit, une marque...',
-            style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

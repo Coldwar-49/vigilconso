@@ -174,6 +174,31 @@ class RappelService {
     return [];
   }
 
+  /// Fetch brand autocomplete suggestions from the RappelConso API.
+  /// Uses search() instead of like to avoid the like+group_by bug (VERIFIED 2026-06-16).
+  /// Returns [] on error or timeout (graceful degradation — suggestions are non-critical).
+  static Future<List<String>> fetchSuggestions(String prefix) async {
+    final sanitized = prefix.trim().replaceAll('"', '');
+    if (sanitized.length < 2) return [];
+    try {
+      final where = Uri.encodeQueryComponent('search(marque_produit,"$sanitized")');
+      final url = '${AppConstants.apiBaseUrl}/records'
+          '?where=$where&select=marque_produit&group_by=marque_produit&limit=8';
+      final response =
+          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return (data['results'] as List? ?? [])
+            .map((r) => (r['marque_produit'] ?? '').toString())
+            .where((s) => s.isNotEmpty)
+            .toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// Parse une date au format ISO (yyyy-MM-dd) ou dd/MM/yyyy.
   /// Méthode publique — utilisée par SearchScreen et rappel_screen.dart.
   static DateTime? parseDate(String dateStr) {

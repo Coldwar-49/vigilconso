@@ -2,9 +2,12 @@
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('SearchScreen', () {
-    test('suggestions apparaissent après 2 caractères saisis', () {}, skip: 'Wave 0 stub — Plan 3');
-    test('suggestions masquées quand champ vide', () {}, skip: 'Wave 0 stub — Plan 3');
-    test('tap suggestion soumet la recherche', () {}, skip: 'Wave 0 stub — Plan 3');
+  group('SearchScreen — logique debounce (comportements)', () {
+    test('suggestions masquées pour < 2 chars', () {},
+        skip: 'Nécessite widget test avec mock HTTP — Phase 6');
+    test('suggestions apparaissent après debounce 300ms', () {},
+        skip: 'Nécessite widget test avec mock HTTP — Phase 6');
+    test('tap suggestion soumet la recherche', () {},
+        skip: 'Nécessite widget test avec mock HTTP — Phase 6');
   });
 }
