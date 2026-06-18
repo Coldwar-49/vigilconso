@@ -11,6 +11,7 @@ import 'package:vigiconso/screens/search_screen.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
 import 'package:vigiconso/services/subscribe_to_newsletter.dart' show NotificationService;
 import 'package:vigiconso/services/rappel_service.dart';
+import 'package:vigiconso/services/read_status_service.dart';
 import 'package:vigiconso/screens/rappel_details_page.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -68,7 +69,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         final newCount = await _countNewAlerts(results);
         await _saveLastSeenDate(results);
-        newAlertsNotifier.value = newCount;
+        final unreadCount = await ReadStatusService.getUnreadCount(results);
+        newAlertsNotifier.value = unreadCount;
         setState(() {
           _latestRappels = results;
           _newAlertsCount = newCount;

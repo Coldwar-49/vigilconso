@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vigiconso/screens/rappel_details_page.dart';
 import 'package:vigiconso/services/rappel_service.dart';
+import 'package:vigiconso/services/read_status_service.dart';
 import 'package:vigiconso/services/search_history_service.dart';
 import 'package:vigiconso/widgets/filter_panel.dart';
 
@@ -151,6 +152,11 @@ class _SearchScreenState extends State<SearchScreen>
     }
   }
 
+  Future<void> _loadReadStatus() async {
+    final ids = await ReadStatusService.getReadIds();
+    if (mounted) setState(() => _readIds = ids);
+  }
+
   Future<void> _loadHistory() async {
     final history = await SearchHistoryService.getHistory();
     if (mounted) setState(() => _searchHistory = history);
@@ -223,6 +229,7 @@ class _SearchScreenState extends State<SearchScreen>
         _isLoading = false;
       });
       _staggerController.forward(from: 0);
+      _loadReadStatus();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -301,6 +308,7 @@ class _SearchScreenState extends State<SearchScreen>
         _isLoading = false;
       });
       _staggerController.forward(from: 0);
+      _loadReadStatus();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -569,6 +577,8 @@ class _SearchScreenState extends State<SearchScreen>
         rappel['risque_produit']?.toString();
     final imageUrl = _extractFirstImageUrl(rappel);
     final cs = Theme.of(context).colorScheme;
+    final id = ReadStatusService.getRappelId(rappel);
+    final isRead = _readIds.contains(id);
 
     DateTime? parsedDate;
     bool isNew = false;
@@ -624,9 +634,14 @@ class _SearchScreenState extends State<SearchScreen>
           ),
           clipBehavior: Clip.hardEdge,
           child: Semantics(
-            label: '$title, $brand, $timeLabel, non lu',
+            label: '$title, $brand, $timeLabel${isRead ? '' : ', non lu'}',
             child: InkWell(
-              onTap: () => _openDetails(rappel),
+              onTap: () {
+                if (id.isNotEmpty && !_readIds.contains(id)) {
+                  setState(() => _readIds = {..._readIds, id});
+                }
+                _openDetails(rappel);
+              },
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Row(
@@ -640,6 +655,25 @@ class _SearchScreenState extends State<SearchScreen>
                           // Badges en haut
                           Row(
                             children: [
+                              if (!isRead)
+                                Container(
+                                  margin: const EdgeInsets.only(right: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: cs.primary,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    'NON LU',
+                                    style: TextStyle(
+                                      color: cs.onPrimary,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
                               if (isNew)
                                 Container(
                                   margin: const EdgeInsets.only(right: 6),

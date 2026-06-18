@@ -3,6 +3,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
 import 'package:vigiconso/services/favorites_service.dart';
+import 'package:vigiconso/services/read_status_service.dart';
 
 class RappelDetailsPage extends StatefulWidget {
   final dynamic rappel;
@@ -25,6 +26,14 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
     super.initState();
     _imagePageController = PageController();
     _checkFavoriteStatus();
+    _markAsRead();
+  }
+
+  Future<void> _markAsRead() async {
+    final id = ReadStatusService.getRappelId(widget.rappel);
+    if (id.isNotEmpty) {
+      await ReadStatusService.markAsRead(id);
+    }
   }
 
   Future<void> _checkFavoriteStatus() async {

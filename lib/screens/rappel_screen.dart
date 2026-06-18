@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:vigiconso/screens/rappel_details_page.dart';
 import 'package:vigiconso/services/rappel_service.dart';
+import 'package:vigiconso/services/read_status_service.dart';
 import 'package:vigiconso/utils/constants.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
 
@@ -24,6 +25,7 @@ class RappelListScreen extends StatefulWidget {
 class _RappelListScreenState extends State<RappelListScreen>
     with TickerProviderStateMixin {
   bool _isNewestFirst = true;
+  Set<String> _readIds = {};
   List<dynamic> _rappels = [];
   List<dynamic> _filteredRappels = [];
   bool _isLoading = false;
@@ -43,11 +45,17 @@ class _RappelListScreenState extends State<RappelListScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
+    _loadReadStatus();
     if (widget.initialSearch.isNotEmpty) {
       _searchQuery = widget.initialSearch;
       _searchController.text = widget.initialSearch;
     }
     _loadRappels();
+  }
+
+  Future<void> _loadReadStatus() async {
+    final ids = await ReadStatusService.getReadIds();
+    if (mounted) setState(() => _readIds = ids);
   }
 
   void _toggleSortOrder() {
@@ -251,6 +259,8 @@ class _RappelListScreenState extends State<RappelListScreen>
         ?? rappel['risque_produit']?.toString();
     final imageUrl = _extractFirstImageUrl(rappel);
     final cs = Theme.of(context).colorScheme;
+    final id = ReadStatusService.getRappelId(rappel);
+    final isRead = _readIds.contains(id);
 
     DateTime? parsedDate;
     bool isNew = false;
@@ -293,8 +303,15 @@ class _RappelListScreenState extends State<RappelListScreen>
             side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
           ),
           clipBehavior: Clip.hardEdge,
-          child: InkWell(
-            onTap: () => _openProductDetails(rappel),
+          child: Semantics(
+            label: '$title, $brand, $timeLabel${isRead ? '' : ', non lu'}',
+            child: InkWell(
+            onTap: () {
+              if (id.isNotEmpty && !_readIds.contains(id)) {
+                setState(() => _readIds = {..._readIds, id});
+              }
+              _openProductDetails(rappel);
+            },
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Row(
@@ -308,6 +325,17 @@ class _RappelListScreenState extends State<RappelListScreen>
                         // Badges en haut
                         Row(
                           children: [
+                            if (!isRead)
+                              Container(
+                                margin: const EdgeInsets.only(right: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: cs.primary,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text('NON LU',
+                                  style: TextStyle(color: cs.onPrimary, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                              ),
                             if (isNew)
                               Container(
                                 margin: const EdgeInsets.only(right: 6),
@@ -388,6 +416,7 @@ class _RappelListScreenState extends State<RappelListScreen>
               ),
             ),
           ),
+          ),  // closes Semantics
         ),
       ),
     );
