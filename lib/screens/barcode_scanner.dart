@@ -5,28 +5,52 @@ import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 
 class BarcodeScannerPage extends StatefulWidget {
-  const BarcodeScannerPage({Key? key}) : super(key: key);
+  const BarcodeScannerPage({super.key});
 
   @override
+  // ignore: library_private_types_in_public_api
   _BarcodeScannerPageState createState() => _BarcodeScannerPageState();
 }
 
-class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
+class _BarcodeScannerPageState extends State<BarcodeScannerPage>
+    with WidgetsBindingObserver {
   String _scanResult = 'Scannez un code-barres pour vérifier les rappels';
   bool _isLoading = false;
-  MobileScannerController? _scannerController;
+  late MobileScannerController _controller;
   String? _lastScannedBarcode;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _controller = MobileScannerController(
+      autoStart: false,
+      detectionSpeed: DetectionSpeed.normal,
+      formats: [
+        BarcodeFormat.ean8,
+        BarcodeFormat.ean13,
+        BarcodeFormat.qrCode,
+      ],
+      facing: CameraFacing.back,
+    );
     _requestCameraPermission();
   }
 
   @override
   void dispose() {
-    _scannerController?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _controller.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _controller.start();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _controller.stop();
+    }
   }
 
   Future<void> _requestCameraPermission() async {
@@ -59,18 +83,10 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
     });
 
     try {
-      // Créer le contrôleur s'il n'existe pas encore
-      _scannerController ??= MobileScannerController(
-        detectionSpeed: DetectionSpeed.normal,
-        formats: [
-          BarcodeFormat.ean8,
-          BarcodeFormat.ean13,
-          BarcodeFormat.qrCode
-        ],
-        facing: CameraFacing.back,
-      );
+      // Démarrer le scanner et ouvrir un nouvel écran de scan
+      await _controller.start();
 
-      // Ouvrir un nouveau screen de scan
+      if (!mounted) return;
       final result = await Navigator.push<String?>(
         context,
         MaterialPageRoute(
@@ -83,7 +99,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
               ),
             ),
             body: MobileScanner(
-              controller: _scannerController!,
+              controller: _controller,
               onDetect: (capture) {
                 final barcodes = capture.barcodes;
                 if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
@@ -94,6 +110,9 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
           ),
         ),
       );
+
+      // Arrêter le scanner quand on quitte l'écran de scan
+      await _controller.stop();
 
       // Gérer le cas où l'utilisateur annule le scan
       if (result == null) {
@@ -107,12 +126,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
       _lastScannedBarcode = result;
 
       // Vérifier le rappel via l'API
-      final recallInfo = await _checkProductRecall(result);
-
-      setState(() {
-        _scanResult = recallInfo;
-        _isLoading = false;
-      });
+      await _checkProductRecall(result);
     } catch (e) {
       setState(() {
         _scanResult = 'Erreur lors du scan: ${e.toString()}';
@@ -121,65 +135,79 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
     }
   }
 
-  Future<String> _checkProductRecall(String barcode) async {
+  Future<void> _checkProductRecall(String barcode) async {
     try {
-      // API de RappelConso en France
+      // API RappelConso v2.1 — dataset GTIN trie pour recherche exacte par code-barres
+      const String gtinDataset = 'rappelconso-v2-gtin-trie';
+      final encodedWhere = Uri.encodeQueryComponent('gtin="$barcode"');
+      final apiUrl =
+          'https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/$gtinDataset/records'
+          '?where=$encodedWhere&limit=5';
+
       final response = await http
-          .get(
-            Uri.parse(
-                'https://data.economie.gouv.fr/api/records/1.0/search/?dataset=rappelconso0&q=$barcode&rows=5'),
-          )
+          .get(Uri.parse(apiUrl))
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final results = List<dynamic>.from(data['results'] ?? []);
 
-        // Vérifier si des rappels ont été trouvés
-        if (data['nhits'] > 0) {
-          // Construction d'un message détaillé
-          final StringBuffer result = StringBuffer();
-          result.writeln('⚠️ ATTENTION: Produit rappelé!');
-          result.writeln('Code-barres: $barcode');
-
-          // Parcourir les résultats (limité à 5 max)
-          final int resultCount = data['nhits'] > 5 ? 5 : data['nhits'];
-          for (int i = 0; i < resultCount; i++) {
-            try {
-              final record = data['records'][i]['fields'];
-              result.writeln('\n--- Rappel ${i + 1} ---');
-              result.writeln(
-                  'Produit: ${record['nom_de_la_marque_du_produit'] ?? 'Non spécifié'}');
-              result.writeln(
-                  'Référence: ${record['reference_fiche'] ?? 'Non spécifiée'}');
-              result.writeln(
-                  'Raison: ${record['motif_du_rappel'] ?? 'Non spécifiée'}');
-              result.writeln(
-                  'Date: ${record['date_de_publication'] ?? 'Non spécifiée'}');
-
-              // Ajouter le lien si disponible
-              final lien = record['lien_vers_la_fiche_rappel'];
-              if (lien != null && lien.toString().isNotEmpty) {
-                result.writeln('Plus d\'infos: $lien');
-              }
-            } catch (e) {
-              result
-                  .writeln('Erreur lors de l\'analyse du rappel ${i + 1}: $e');
-            }
-          }
-
-          // Indiquer s'il y a plus de résultats
-          if (data['nhits'] > 5) {
-            result
-                .writeln('\nNB: ${data['nhits'] - 5} autres rappels trouvés.');
-          }
-
-          return result.toString();
+        if (results.isEmpty) {
+          setState(() {
+            _scanResult =
+                '✅ Aucun rappel trouvé pour ce produit (code-barres: $barcode)';
+            _isLoading = false;
+          });
+          return;
         }
-        return '✅ Aucun rappel trouvé pour ce produit (code-barres: $barcode)';
+
+        // Construction du message détaillé à partir des champs v2.1
+        final StringBuffer result = StringBuffer();
+        result.writeln('⚠️ ATTENTION: Produit rappelé!');
+        result.writeln('Code-barres: $barcode');
+
+        for (int i = 0; i < results.length; i++) {
+          final item = results[i] as Map<String, dynamic>;
+          result.writeln('\n--- Rappel ${i + 1} ---');
+          result.writeln(
+              'Produit: ${item['libelle'] ?? item['modeles_ou_references'] ?? 'Non spécifié'}');
+          result.writeln(
+              'Marque: ${item['marque_produit'] ?? 'Non spécifiée'}');
+          result.writeln(
+              'Raison: ${item['motif_rappel'] ?? 'Non spécifiée'}');
+          result.writeln(
+              'Date: ${item['date_publication'] ?? 'Non spécifiée'}');
+
+          // Utiliser directement l'URL complète v2.1 (lien_vers_la_fiche_rappel)
+          final officialUrl =
+              item['lien_vers_la_fiche_rappel']?.toString() ?? '';
+          if (officialUrl.isNotEmpty) {
+            result.writeln('Plus d\'infos: $officialUrl');
+          }
+        }
+
+        // Indiquer s'il y a potentiellement plus de résultats
+        final totalCount = data['total_count'] as int? ?? results.length;
+        if (totalCount > 5) {
+          result.writeln('\nNB: ${totalCount - 5} autres rappels trouvés.');
+        }
+
+        setState(() {
+          _scanResult = result.toString();
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _scanResult =
+              'Erreur API (${response.statusCode}). Réessayez.';
+          _isLoading = false;
+        });
       }
-      return 'Erreur lors de la vérification du produit (code HTTP: ${response.statusCode})';
     } catch (e) {
-      return 'Erreur de connexion à l\'API: ${e.toString()}';
+      setState(() {
+        _scanResult = 'Erreur de connexion: ${e.toString()}';
+        _isLoading = false;
+      });
     }
   }
 
@@ -208,8 +236,8 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
                 ),
                 const SizedBox(height: 30),
                 if (_isLoading)
-                  Column(
-                    children: const [
+                  const Column(
+                    children: [
                       CircularProgressIndicator(),
                       SizedBox(height: 20),
                       Text('Consultation de la base de rappels...'),
@@ -221,10 +249,10 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
                     width: double.infinity,
                     decoration: BoxDecoration(
                       color: _scanResult.contains('ATTENTION')
-                          ? Colors.red.withOpacity(0.1)
+                          ? Colors.red.withValues(alpha: 0.1)
                           : _scanResult.contains('✅')
-                              ? Colors.green.withOpacity(0.1)
-                              : Colors.grey.withOpacity(0.1),
+                              ? Colors.green.withValues(alpha: 0.1)
+                              : Colors.grey.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: _scanResult.contains('ATTENTION')
@@ -269,12 +297,7 @@ class _BarcodeScannerPageState extends State<BarcodeScannerPage> {
                                 _isLoading = true;
                                 _scanResult = 'Vérification en cours...';
                               });
-                              final recallInfo = await _checkProductRecall(
-                                  _lastScannedBarcode!);
-                              setState(() {
-                                _scanResult = recallInfo;
-                                _isLoading = false;
-                              });
+                              await _checkProductRecall(_lastScannedBarcode!);
                             },
                     ),
                   ),

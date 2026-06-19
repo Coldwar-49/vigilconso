@@ -140,6 +140,44 @@ app.post('/newsletter', async (req, res) => {
   }
 });
 
+// ── Route : formulaire de contact ─────────────────────────────────
+// POST /contact — Soumet un message de contact depuis l'application
+// Validation: name, email (regex), subject, message — tous obligatoires
+// Sécurité: validation serveur conformément à T-02-01 (ASVS V5 Input Validation)
+app.post('/contact', async (req, res) => {
+  const { name, email, subject, message } = req.body;
+
+  // Valider tous les champs obligatoires (T-02-01: validation côté serveur)
+  if (!name || !email || !subject || !message) {
+    return res.status(400).json({ message: 'Champs requis manquants.' });
+  }
+
+  // Valider le format email avec isValidEmail existant (défini ligne ~16)
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ message: 'Email invalide.' });
+  }
+
+  // Valider les longueurs (prévenir les abus)
+  if (name.length > 100 || subject.length > 200 || message.length > 5000) {
+    return res.status(400).json({ message: 'Champs trop longs.' });
+  }
+
+  try {
+    // Utiliser le transporter existant (configuré lignes ~33-41) — pas de nouvelle infra
+    await transporter.sendMail({
+      from: `VigilConso <${process.env.FROM_EMAIL}>`,
+      to: process.env.FROM_EMAIL,  // boîte admin reçoit le contact
+      replyTo: email,              // la réponse part vers l'expéditeur
+      subject: `[Contact VigilConso] ${subject}`,
+      text: `De: ${name} <${email}>\n\n${message}`,
+    });
+    return res.status(200).json({ message: 'Message envoyé avec succès.' });
+  } catch (error) {
+    console.error('Erreur contact:', error.message);
+    return res.status(500).json({ message: "Erreur d'envoi. Réessayez." });
+  }
+});
+
 // ── Route : envoi email générique ─────────────────────────────────
 app.post('/send-email', async (req, res) => {
   const { to, subject, text, html } = req.body;
