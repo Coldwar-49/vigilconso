@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vigiconso/utils/image_utils.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
 import 'package:vigiconso/services/favorites_service.dart';
 import 'package:vigiconso/services/read_status_service.dart';
@@ -8,7 +9,7 @@ import 'package:vigiconso/services/read_status_service.dart';
 class RappelDetailsPage extends StatefulWidget {
   final dynamic rappel;
 
-  const RappelDetailsPage({Key? key, required this.rappel}) : super(key: key);
+  const RappelDetailsPage({super.key, required this.rappel});
 
   @override
   State<RappelDetailsPage> createState() => _RappelDetailsPageState();
@@ -67,7 +68,7 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
   void _shareRappel() {
     final title = widget.rappel['libelle'] ?? 'Produit rappelé';
     final brand = widget.rappel['marque_produit'] ?? widget.rappel['nom_marque'] ?? '';
-    final ref = widget.rappel['reference_fiche'] ?? '';
+    final officialUrl = widget.rappel['lien_vers_la_fiche_rappel']?.toString() ?? '';
     final rawRisques = widget.rappel['risques_encourus'];
     String risques = '';
     if (rawRisques is String) risques = rawRisques.split(RegExp(r'[|,]')).first.trim();
@@ -76,17 +77,19 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
     buffer.writeln('🚨 Rappel produit : $title');
     if (brand.isNotEmpty) buffer.writeln('Marque : $brand');
     if (risques.isNotEmpty) buffer.writeln('Risque : $risques');
-    if (ref.isNotEmpty) buffer.writeln('\nFiche officielle :');
-    if (ref.isNotEmpty) buffer.writeln('https://rappel.conso.gouv.fr/fiche-rappel/$ref');
+    if (officialUrl.isNotEmpty) buffer.writeln('\nFiche officielle :');
+    if (officialUrl.isNotEmpty) buffer.writeln(officialUrl);
     buffer.writeln('\nVia VigilConso');
 
     Share.share(buffer.toString(), subject: title);
   }
 
+  /// Opens the official recall page using the full URL from lien_vers_la_fiche_rappel.
+  /// (reference_fiche is null/absent in v2 API — do NOT use it to construct a URL)
   Future<void> _openOfficialPage() async {
-    final ref = widget.rappel['reference_fiche'] ?? '';
-    if (ref.isEmpty) return;
-    final uri = Uri.parse('https://rappel.conso.gouv.fr/fiche-rappel/$ref');
+    final officialUrl = widget.rappel['lien_vers_la_fiche_rappel']?.toString() ?? '';
+    if (officialUrl.isEmpty) return;
+    final uri = Uri.parse(officialUrl);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -119,6 +122,7 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
                 const AppMenu(),
               ],
             ),
+      bottomNavigationBar: _isFullScreenImage ? null : _buildStickyActionBar(),
       body: _isFullScreenImage
           ? _buildFullScreenImage()
           : SingleChildScrollView(
@@ -135,6 +139,13 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
                   _buildRiskSection(),
                   const SizedBox(height: 20),
                   _buildConsumerActions(),
+                  const SizedBox(height: 20),
+                  _buildDatesSection(),
+                  const SizedBox(height: 20),
+                  Builder(builder: (_) {
+                    final lots = _buildLotsSection();
+                    return lots ?? const SizedBox.shrink();
+                  }),
                   const SizedBox(height: 20),
                   _buildContactInfo(),
                 ],
@@ -196,7 +207,7 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
             onTap: () => setState(() => _isFullScreenImage = false),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black.withValues(alpha: 0.5),
                 shape: BoxShape.circle,
               ),
               padding: const EdgeInsets.all(8),
@@ -309,18 +320,12 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
     ]);
   }
 
-  /// Retourne l'URL de l'image via le proxy wsrv.nl (toutes plateformes).
-  String _proxiedImageUrl(String url) {
-    final encoded = Uri.encodeComponent(url);
-    return 'https://wsrv.nl/?url=$encoded&output=jpg&q=85';
-  }
-
   Widget _buildNetworkImageWithFallback(
     String url, {
     BoxFit fit = BoxFit.cover,
     required Widget Function(BuildContext) hasError,
   }) {
-    final imageUrl = _proxiedImageUrl(url);
+    final imageUrl = ImageUtils.proxiedUrl(url);
 
     return Image.network(
       imageUrl,
@@ -344,6 +349,105 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
         debugPrint('Erreur image: $error');
         return hasError(context);
       },
+    );
+  }
+
+  Widget _buildSectionCard({required String title, required Widget content, Color? cardColor}) {
+    return Card(
+      color: cardColor,
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Divider(),
+          content,
+        ]),
+      ),
+    );
+  }
+
+  /// Section dates clés — toujours affichée, valeurs nulles → 'Non spécifié'
+  Widget _buildDatesSection() {
+    return _buildSectionCard(
+      title: 'Dates clés',
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildInfoRow('Publié', widget.rappel['date_publication']),
+          _buildInfoRow('Début de commercialisation', widget.rappel['date_debut_commercialisation']),
+          _buildInfoRow('Fin de commercialisation', widget.rappel['date_date_fin_commercialisation']),
+          _buildInfoRow('Fin de rappel', widget.rappel['date_de_fin_de_la_procedure_de_rappel']),
+        ],
+      ),
+    );
+  }
+
+  /// Section lots concernés — masquée si conditionnements est absent/vide (per CONTEXT.md)
+  Widget? _buildLotsSection() {
+    final lots = widget.rappel['conditionnements']?.toString() ?? '';
+    if (lots.isEmpty) return null;
+    return _buildSectionCard(
+      title: 'Lots concernés',
+      content: Text(
+        lots,
+        style: const TextStyle(fontSize: 14, height: 1.5),
+      ),
+    );
+  }
+
+  /// Sticky action bar at the bottom of the screen.
+  /// Primary action: Voir la fiche officielle (uses lien_vers_la_fiche_rappel — full URL)
+  /// Secondary: Télécharger affichette PDF (if URL present)
+  /// Share: via share_plus
+  Widget _buildStickyActionBar() {
+    final officialUrl = widget.rappel['lien_vers_la_fiche_rappel']?.toString() ?? '';
+    final pdfUrl = widget.rappel['lien_vers_affichette_pdf']?.toString() ?? '';
+    final shareText = '${widget.rappel['libelle'] ?? 'Rappel'} — '
+        '${widget.rappel['marque_produit'] ?? ''}\n'
+        'Via VigilConso\n$officialUrl';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, -2))],
+      ),
+      child: Row(
+        children: [
+          // Voir la fiche officielle — primary action
+          Expanded(
+            flex: 2,
+            child: FilledButton.icon(
+              icon: const Icon(Icons.open_in_new, size: 16),
+              label: const Text('Fiche officielle', overflow: TextOverflow.ellipsis),
+              onPressed: officialUrl.isEmpty ? null : _openOfficialPage,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Télécharger PDF — shown only if URL available
+          if (pdfUrl.isNotEmpty) ...[
+            IconButton.outlined(
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              tooltip: 'Affichette PDF',
+              onPressed: () async {
+                final uri = Uri.parse(pdfUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+            const SizedBox(width: 8),
+          ],
+          // Partager
+          IconButton.outlined(
+            icon: const Icon(Icons.share_outlined),
+            tooltip: 'Partager',
+            onPressed: () => Share.share(shareText),
+          ),
+        ],
+      ),
     );
   }
 
@@ -426,7 +530,7 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
 
     final cs = Theme.of(context).colorScheme;
     return Card(
-      color: cs.tertiaryContainer.withOpacity(0.5),
+      color: cs.tertiaryContainer.withValues(alpha: 0.5),
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -462,7 +566,7 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
                     style: TextStyle(fontSize: 13, color: cs.onErrorContainer, fontWeight: FontWeight.w600),
                   ),
                   backgroundColor: cs.errorContainer,
-                  side: BorderSide(color: cs.error.withOpacity(0.4)),
+                  side: BorderSide(color: cs.error.withValues(alpha: 0.4)),
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                 )).toList(),
               ),
@@ -498,7 +602,7 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
 
     final cs = Theme.of(context).colorScheme;
     return Card(
-      color: cs.errorContainer.withOpacity(0.5),
+      color: cs.errorContainer.withValues(alpha: 0.5),
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -544,7 +648,6 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
   }
 
   Widget _buildContactInfo() {
-    final ref = widget.rappel['reference_fiche'] ?? '';
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -560,19 +663,6 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
             const Divider(),
             _buildInfoRow('Contact', widget.rappel['numero_contact']),
             _buildInfoRow('Compensation', widget.rappel['modalites_de_compensation']),
-            _buildInfoRow('Date limite de rappel', widget.rappel['date_de_fin_de_la_procedure_de_rappel']),
-            if (ref.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.open_in_new, size: 18),
-                  label: const Text('Voir la fiche officielle'),
-                  onPressed: _openOfficialPage,
-                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
-                ),
-              ),
-            ],
           ],
         ),
       ),

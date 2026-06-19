@@ -54,7 +54,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Dates clés'), findsOneWidget);
-      expect(find.text('Publié'), findsOneWidget);
+      expect(find.text('Publié :'), findsOneWidget);
     });
 
     testWidgets('shows Fiche officielle button', (tester) async {
