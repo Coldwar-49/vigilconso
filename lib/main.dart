@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vigiconso/screens/main_screen.dart';
 import 'package:vigiconso/screens/onboarding_screen.dart';
 import 'package:vigiconso/services/subscribe_to_newsletter.dart' show NotificationService;
 
-const String _oneSignalAppId = 'eb3fd80e-1a70-468f-ab2e-e1d2eb9592ab';
+const String _oneSignalAppId = String.fromEnvironment(
+  'ONESIGNAL_APP_ID',
+  defaultValue: '', // empty in flutter test — guard below prevents crash
+);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Sur mobile : initialise OneSignal. Sur web : ne fait rien.
-  NotificationService.initialize(_oneSignalAppId);
+  // Guard: dart-define returns '' in flutter test — avoid crash
+  if (_oneSignalAppId.isNotEmpty) {
+    NotificationService.initialize(_oneSignalAppId);
+  }
 
   final prefs = await SharedPreferences.getInstance();
 
@@ -24,7 +31,11 @@ void main() async {
   // Détermine si l'onboarding a déjà été affiché
   final onboardingShown = prefs.getBool('onboarding_shown') ?? false;
 
-  runApp(RappelConsoApp(showOnboarding: !onboardingShown));
+  runApp(
+    ProviderScope(
+      child: RappelConsoApp(showOnboarding: !onboardingShown),
+    ),
+  );
 }
 
 class RappelConsoApp extends StatelessWidget {
