@@ -1,32 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:vigiconso/providers/favorites_provider.dart';
 import 'package:vigiconso/services/favorites_service.dart';
 import 'package:vigiconso/screens/rappel_details_page.dart';
+import 'package:vigiconso/utils/image_utils.dart';
+import 'package:vigiconso/widgets/shimmer_loading.dart';
 
-class FavoritesScreen extends StatefulWidget {
+class FavoritesScreen extends ConsumerStatefulWidget {
   const FavoritesScreen({super.key});
   @override
-  State<FavoritesScreen> createState() => _FavoritesScreenState();
+  ConsumerState<FavoritesScreen> createState() => _FavoritesScreenState();
 }
 
-class _FavoritesScreenState extends State<FavoritesScreen> {
-  List<Map<String, dynamic>> _favorites = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadFavorites();
-  }
-
-  Future<void> _loadFavorites() async {
-    final favs = await FavoritesService.getFavorites();
-    if (mounted) setState(() { _favorites = favs; _isLoading = false; });
-  }
+class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
 
   Future<void> _removeFavorite(String id) async {
     await FavoritesService.removeFavorite(id);
-    await _loadFavorites();
+    ref.invalidate(favoritesProvider); // trigger provider rebuild
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Retiré des favoris'), duration: Duration(seconds: 2), behavior: SnackBarBehavior.floating),
@@ -46,11 +37,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       }
     }
     return null;
-  }
-
-  String _proxiedUrl(String url) {
-    final encoded = Uri.encodeComponent(url);
-    return 'https://wsrv.nl/?url=$encoded&output=jpg&q=85';
   }
 
   Widget _buildFavCard(Map<String, dynamic> rappel) {
@@ -82,7 +68,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               aspectRatio: 2.64,
               child: rawImageUrl != null
                   ? Image.network(
-                      _proxiedUrl(rawImageUrl),
+                      ImageUtils.proxiedUrl(rawImageUrl),
                       fit: BoxFit.cover,
                       loadingBuilder: (_, child, p) => p == null ? child : Container(color: cs.primaryContainer, child: const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)))),
                       errorBuilder: (_, __, ___) => _imagePlaceholder(cs),
@@ -140,62 +126,88 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     ])),
   );
 
+  Widget _buildEmptyState(ColorScheme cs) => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+    Icon(Icons.favorite_border, size: 80, color: cs.surfaceContainerHighest),
+    const SizedBox(height: 16),
+    Text('Aucun favori pour le moment', style: TextStyle(fontSize: 18, color: cs.onSurfaceVariant)),
+    const SizedBox(height: 8),
+    Text('Ajoutez des rappels depuis leur page détail.', style: TextStyle(color: cs.onSurfaceVariant), textAlign: TextAlign.center),
+  ]));
+
+  Widget _buildGrid(List<Map<String, dynamic>> favorites) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final cardWidth = (constraints.maxWidth - 32 - 10) / 2;
+      final ratio = cardWidth / (cardWidth / 2.64 + 90);
+      return GridView.builder(
+        padding: const EdgeInsets.all(16),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: ratio),
+        itemCount: favorites.length,
+        itemBuilder: (_, i) => _buildFavCard(favorites[i]),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final favoritesAsync = ref.watch(favoritesProvider);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Mes favoris (${_favorites.length})'),
+        title: favoritesAsync.when(
+          data: (favs) => Text('Mes favoris (${favs.length})'),
+          loading: () => const Text('Mes favoris'),
+          error: (_, __) => const Text('Mes favoris'),
+        ),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         actions: [
-          if (_favorites.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.delete_sweep),
-              tooltip: 'Tout supprimer',
-              onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    title: const Text('Vider les favoris'),
-                    content: const Text('Supprimer tous vos favoris ?'),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
-                      ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Supprimer')),
-                    ],
-                  ),
-                );
-                if (confirm == true) {
-                  for (final f in List.from(_favorites)) {
-                    await FavoritesService.removeFavorite(f['reference_fiche'] ?? f['libelle'] ?? '');
-                  }
-                  await _loadFavorites();
-                }
-              },
-            ),
+          favoritesAsync.when(
+            data: (favs) => favs.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.delete_sweep),
+                    tooltip: 'Tout supprimer',
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('Vider les favoris'),
+                          content: const Text('Supprimer tous vos favoris ?'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+                            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Supprimer')),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        final maps = await FavoritesService.getFavorites();
+                        for (final f in maps) {
+                          await FavoritesService.removeFavorite(f['reference_fiche'] ?? f['libelle'] ?? '');
+                        }
+                        ref.invalidate(favoritesProvider);
+                      }
+                    },
+                  )
+                : const SizedBox.shrink(),
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _favorites.isEmpty
-              ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(Icons.favorite_border, size: 80, color: cs.surfaceContainerHighest),
-                  const SizedBox(height: 16),
-                  Text('Aucun favori pour le moment', style: TextStyle(fontSize: 18, color: cs.onSurfaceVariant)),
-                  const SizedBox(height: 8),
-                  Text('Ajoutez des rappels depuis leur page détail.', style: TextStyle(color: cs.onSurfaceVariant), textAlign: TextAlign.center),
-                ]))
-              : LayoutBuilder(builder: (context, constraints) {
-                  final cardWidth = (constraints.maxWidth - 32 - 10) / 2;
-                  final ratio = cardWidth / (cardWidth / 2.64 + 90);
-                  return GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: ratio),
-                    itemCount: _favorites.length,
-                    itemBuilder: (_, i) => _buildFavCard(_favorites[i]),
-                  );
-                }),
+      body: favoritesAsync.when(
+        loading: () => ListView.builder(
+          itemCount: 4,
+          itemBuilder: (_, __) => const RappelCardShimmer(),
+        ),
+        error: (e, _) => _buildEmptyState(cs),
+        data: (favorites) {
+          final maps = favorites.map((r) => r.toJson()).toList();
+          return maps.isEmpty
+              ? _buildEmptyState(cs)
+              : _buildGrid(maps);
+        },
+      ),
     );
   }
 }

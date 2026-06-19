@@ -52,9 +52,9 @@ class _MainScreenState extends State<MainScreen> {
               label: 'Accueil',
             ),
             const NavigationDestination(
-              icon: Icon(Icons.grid_view_outlined),
-              selectedIcon: Icon(Icons.grid_view),
-              label: 'Catégories',
+              icon: Icon(Icons.list_alt_outlined),
+              selectedIcon: Icon(Icons.list_alt),
+              label: 'Rappels',
             ),
             const NavigationDestination(
               icon: Icon(Icons.favorite_outline),

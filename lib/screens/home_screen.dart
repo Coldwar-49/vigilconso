@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vigiconso/services/alerts_notifier.dart';
@@ -8,19 +9,20 @@ import 'package:vigiconso/screens/barcode_scanner.dart';
 import 'package:vigiconso/screens/categories_screen.dart';
 import 'package:vigiconso/screens/rappel_screen.dart';
 import 'package:vigiconso/screens/search_screen.dart';
+import 'package:vigiconso/utils/image_utils.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
 import 'package:vigiconso/services/subscribe_to_newsletter.dart' show NotificationService;
 import 'package:vigiconso/services/rappel_service.dart';
 import 'package:vigiconso/services/read_status_service.dart';
 import 'package:vigiconso/screens/rappel_details_page.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
   late final PageController _alertPageController;
   Timer? _autoScrollTimer;
@@ -373,12 +375,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return null;
   }
 
-  /// Retourne l'URL proxiée via wsrv.nl pour corriger le chargement des images
-  String _proxiedUrl(String url) {
-    final encoded = Uri.encodeComponent(url);
-    return 'https://wsrv.nl/?url=$encoded&output=jpg&q=85';
-  }
-
   /// Placeholder affiché quand aucune image n'est disponible
   Widget _categoryPlaceholder(String? categorie, ColorScheme cs) {
     return Container(
@@ -422,7 +418,7 @@ class _HomeScreenState extends State<HomeScreen> {
               aspectRatio: 2.64,
               child: rawImageUrl != null
                   ? Image.network(
-                      _proxiedUrl(rawImageUrl),
+                      ImageUtils.proxiedUrl(rawImageUrl),
                       fit: BoxFit.cover,
                       loadingBuilder: (context, child, loadingProgress) {
                         if (loadingProgress == null) return child;

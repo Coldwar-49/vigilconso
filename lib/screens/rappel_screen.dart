@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:vigiconso/providers/rappel_provider.dart';
 import 'package:vigiconso/screens/rappel_details_page.dart';
 import 'package:vigiconso/services/rappel_service.dart';
 import 'package:vigiconso/services/read_status_service.dart';
 import 'package:vigiconso/utils/constants.dart';
+import 'package:vigiconso/utils/image_utils.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
+import 'package:vigiconso/widgets/shimmer_loading.dart';
 
-class RappelListScreen extends StatefulWidget {
+class RappelListScreen extends ConsumerStatefulWidget {
   final String categoryKey;
   final String categoryTitle;
   final String initialSearch;
@@ -19,16 +23,14 @@ class RappelListScreen extends StatefulWidget {
   });
 
   @override
-  State<RappelListScreen> createState() => _RappelListScreenState();
+  ConsumerState<RappelListScreen> createState() => _RappelListScreenState();
 }
 
-class _RappelListScreenState extends State<RappelListScreen>
+class _RappelListScreenState extends ConsumerState<RappelListScreen>
     with TickerProviderStateMixin {
   bool _isNewestFirst = true;
   Set<String> _readIds = {};
-  List<dynamic> _rappels = [];
   List<dynamic> _filteredRappels = [];
-  bool _isLoading = false;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   int _currentPage = 0;
@@ -58,50 +60,13 @@ class _RappelListScreenState extends State<RappelListScreen>
     if (mounted) setState(() => _readIds = ids);
   }
 
-  void _toggleSortOrder() {
-    setState(() {
-      _isNewestFirst = !_isNewestFirst;
-      _rappels.sort((a, b) {
-        final dateA = RappelService.parseDate(a['date_publication'] ?? '') ?? DateTime(1900);
-        final dateB = RappelService.parseDate(b['date_publication'] ?? '') ?? DateTime(1900);
-        return _isNewestFirst ? dateB.compareTo(dateA) : dateA.compareTo(dateB);
-      });
-      _applyYearFilter();
-    });
-  }
 
-  void _applyYearFilter() {
-    setState(() {
-      _filteredRappels = List.from(_rappels);
-      _currentPage = 0;
-    });
-  }
-
-  Future<void> _loadRappels() async {
-    setState(() { _isLoading = true; _errorMessage = null; });
-    try {
-      final result = await RappelService.fetchRappels(
-        categoryKey: widget.categoryKey,
-        searchQuery: _searchQuery,
-        newestFirst: _isNewestFirst,
-      );
-      if (!mounted) return;
-      if (result.containsKey('error')) {
-        setState(() { _isLoading = false; _errorMessage = result['error']; });
-        return;
-      }
-      final results = List<dynamic>.from(result['results'] ?? []);
-      setState(() {
-        _rappels = results;
-        _filteredRappels = List.from(results);
-        _isLoading = false;
-        _currentPage = 0;
-      });
-      _staggerController.forward(from: 0);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() { _isLoading = false; _errorMessage = 'Erreur: $e'; });
-    }
+  Future<void> _loadRappels({bool forceRefresh = false}) async {
+    setState(() { _errorMessage = null; });
+    await ref.read(rappelServiceProvider.notifier).refresh(
+      categoryKey: widget.categoryKey,
+      forceRefresh: forceRefresh,
+    );
   }
 
   void _openProductDetails(dynamic rappel) {
@@ -146,18 +111,12 @@ class _RappelListScreenState extends State<RappelListScreen>
     return null;
   }
 
-  /// Proxy wsrv.nl pour corriger le chargement des images sur toutes les plateformes
-  String _proxiedUrl(String url) {
-    final encoded = Uri.encodeComponent(url);
-    return 'https://wsrv.nl/?url=$encoded&output=jpg&q=85';
-  }
-
   Widget _buildNetworkImageWithFallback(
     String url, {
     BoxFit fit = BoxFit.cover,
     Widget Function(BuildContext)? errorBuilder,
   }) {
-    final imageUrl = _proxiedUrl(url);
+    final imageUrl = ImageUtils.proxiedUrl(url);
     return Image.network(
       imageUrl,
       fit: fit,
@@ -431,50 +390,10 @@ class _RappelListScreenState extends State<RappelListScreen>
     );
   }
 
-  /// Shimmer pour la liste pendant le chargement
-  Widget _buildCardShimmer() {
-    final cs = Theme.of(context).colorScheme;
-    final shimmerColor = cs.primaryContainer.withValues(alpha: 0.35);
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(height: 10, width: 70, decoration: BoxDecoration(color: shimmerColor, borderRadius: BorderRadius.circular(5))),
-                  const SizedBox(height: 8),
-                  Container(height: 14, decoration: BoxDecoration(color: shimmerColor, borderRadius: BorderRadius.circular(5))),
-                  const SizedBox(height: 5),
-                  Container(height: 14, width: 200, decoration: BoxDecoration(color: shimmerColor, borderRadius: BorderRadius.circular(5))),
-                  const SizedBox(height: 10),
-                  Container(height: 10, width: 120, decoration: BoxDecoration(color: shimmerColor, borderRadius: BorderRadius.circular(5))),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Container(width: 90, height: 90, color: shimmerColor),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final rappelsAsync = ref.watch(rappelServiceProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -511,73 +430,94 @@ class _RappelListScreenState extends State<RappelListScreen>
           ),
 
           Expanded(
-            child: _isLoading
-                ? ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: 6,
-                    itemBuilder: (_, __) => _buildCardShimmer(),
-                  )
-                : _errorMessage != null
-                    ? _buildErrorState()
-                    : _filteredRappels.isEmpty
-                        ? _buildEmptyState()
-                        : Column(
-                            children: [
-                              // Compteur + tri
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      '${_filteredRappels.length} résultats',
-                                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: colorScheme.onSurfaceVariant),
-                                    ),
-                                    Row(children: [
-                                      _buildSortChip(label: 'Récent', icon: Icons.arrow_downward, selected: _isNewestFirst, onTap: () { if (!_isNewestFirst) _toggleSortOrder(); }),
-                                      const SizedBox(width: 6),
-                                      _buildSortChip(label: 'Ancien', icon: Icons.arrow_upward, selected: !_isNewestFirst, onTap: () { if (_isNewestFirst) _toggleSortOrder(); }),
-                                    ]),
-                                  ],
-                                ),
-                              ),
-                              // Liste style Google News
-                              Expanded(
-                                child: ListView.builder(
-                                  padding: const EdgeInsets.only(bottom: 80),
-                                  itemCount: _paginatedRappels.length,
-                                  itemBuilder: (_, i) => _buildRappelCard(_paginatedRappels[i], i),
-                                ),
-                              ),
-                              // Pagination
-                              if (_filteredRappels.length > _pageSize)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      IconButton.outlined(
-                                        icon: const Icon(Icons.chevron_left),
-                                        onPressed: _currentPage > 0
-                                            ? () => setState(() { _currentPage--; _staggerController.forward(from: 0); })
-                                            : null,
-                                      ),
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                                        child: Text('Page ${_currentPage + 1} / ${(_filteredRappels.length / _pageSize).ceil()}',
-                                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                                      ),
-                                      IconButton.outlined(
-                                        icon: const Icon(Icons.chevron_right),
-                                        onPressed: (_currentPage + 1) * _pageSize < _filteredRappels.length
-                                            ? () => setState(() { _currentPage++; _staggerController.forward(from: 0); })
-                                            : null,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
+            child: rappelsAsync.when(
+              loading: () => ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: 6,
+                itemBuilder: (_, __) => const RappelCardShimmer(),
+              ),
+              error: (e, _) {
+                _errorMessage = e.toString();
+                return _buildErrorState();
+              },
+              data: (rappels) {
+                // Apply local search filter and sort
+                List<dynamic> filtered = rappels.map((r) => r.toJson()).toList();
+                if (_searchQuery.isNotEmpty) {
+                  final q = _searchQuery.toLowerCase();
+                  filtered = filtered.where((r) {
+                    final title = (r['libelle'] ?? '').toString().toLowerCase();
+                    final brand = (r['marque_produit'] ?? '').toString().toLowerCase();
+                    final ref2 = (r['modeles_ou_references'] ?? '').toString().toLowerCase();
+                    return title.contains(q) || brand.contains(q) || ref2.contains(q);
+                  }).toList();
+                }
+                filtered.sort((a, b) {
+                  final dateA = RappelService.parseDate(a['date_publication'] ?? '') ?? DateTime(1900);
+                  final dateB = RappelService.parseDate(b['date_publication'] ?? '') ?? DateTime(1900);
+                  return _isNewestFirst ? dateB.compareTo(dateA) : dateA.compareTo(dateB);
+                });
+                _filteredRappels = filtered;
+                if (filtered.isEmpty) return _buildEmptyState();
+                return Column(
+                  children: [
+                    // Compteur + tri
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${filtered.length} résultats',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: colorScheme.onSurfaceVariant),
                           ),
+                          Row(children: [
+                            _buildSortChip(label: 'Récent', icon: Icons.arrow_downward, selected: _isNewestFirst, onTap: () { setState(() => _isNewestFirst = true); }),
+                            const SizedBox(width: 6),
+                            _buildSortChip(label: 'Ancien', icon: Icons.arrow_upward, selected: !_isNewestFirst, onTap: () { setState(() => _isNewestFirst = false); }),
+                          ]),
+                        ],
+                      ),
+                    ),
+                    // Liste style Google News
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 80),
+                        itemCount: _paginatedRappels.length,
+                        itemBuilder: (_, i) => _buildRappelCard(_paginatedRappels[i], i),
+                      ),
+                    ),
+                    // Pagination
+                    if (filtered.length > _pageSize)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton.outlined(
+                              icon: const Icon(Icons.chevron_left),
+                              onPressed: _currentPage > 0
+                                  ? () => setState(() { _currentPage--; _staggerController.forward(from: 0); })
+                                  : null,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: Text('Page ${_currentPage + 1} / ${(filtered.length / _pageSize).ceil()}',
+                                style: const TextStyle(fontWeight: FontWeight.w600)),
+                            ),
+                            IconButton.outlined(
+                              icon: const Icon(Icons.chevron_right),
+                              onPressed: (_currentPage + 1) * _pageSize < filtered.length
+                                  ? () => setState(() { _currentPage++; _staggerController.forward(from: 0); })
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
         ],
       ),
