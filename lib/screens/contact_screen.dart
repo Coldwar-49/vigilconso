@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:vigiconso/widgets/app_menu.dart';
 
 class ContactScreen extends StatefulWidget {
@@ -298,29 +300,53 @@ class _ContactScreenState extends State<ContactScreen> {
 
   Future<void> _sendMessage() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() {
       _isSending = true;
       _statusMessage = null;
     });
 
-    // Simuler l'envoi du message
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // NEWSLETTER_API_URL depuis dart-define; fallback = alias localhost émulateur Android
+      const newsletterApiUrl = String.fromEnvironment(
+        'NEWSLETTER_API_URL',
+        defaultValue: 'http://10.0.2.2:3000',
+      );
+      final response = await http.post(
+        Uri.parse('$newsletterApiUrl/contact'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': _nameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'subject': _subjectController.text.trim(),
+          'message': _messageController.text.trim(),
+        }),
+      ).timeout(const Duration(seconds: 10));
 
-    // Dans une application réelle, vous implémenteriez l'envoi du message ici
-    // Par exemple avec un service API
-
-    setState(() {
-      _isSending = false;
-      _isError = false;
-      _statusMessage =
-          'Votre message a été envoyé avec succès ! Nous vous répondrons dans les plus brefs délais.';
-
-      // Réinitialiser les champs si l'envoi réussit
-      _nameController.clear();
-      _emailController.clear();
-      _subjectController.clear();
-      _messageController.clear();
-    });
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) {
+        setState(() {
+          _isSending = false;
+          _isError = false;
+          _statusMessage = body['message'] as String? ?? 'Envoyé !';
+        });
+        _nameController.clear();
+        _emailController.clear();
+        _subjectController.clear();
+        _messageController.clear();
+      } else {
+        setState(() {
+          _isSending = false;
+          _isError = true;
+          _statusMessage =
+              body['message'] as String? ?? 'Erreur serveur.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isSending = false;
+        _isError = true;
+        _statusMessage = 'Erreur réseau. Réessayez.';
+      });
+    }
   }
 }
