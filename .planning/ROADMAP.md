@@ -113,11 +113,13 @@ Plans:
 3. L'écran de gestion des abonnements liste marques et catégories suivies
 4. L'indicateur de fraîcheur des données est visible sur la liste principale
 
-**Plans:**
-1. Modèle de données abonnements (SharedPreferences/SQLite) + écran de gestion
-2. Fil "Mes alertes" filtré sur les abonnements
-3. Intégration OneSignal — filtrage client-side des notifications selon abonnements
-4. Indicateur cache/live + UX-05
+**Plans:** 4 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Subscriptions model + SubscriptionService + subscriptionProvider + Wave 0 test stubs (wave 1)
+- [ ] 03-02-PLAN.md — mesAlertesProvider (derived filter) + AlertesScreen CRUD + MesAlertesScreen + 5th nav tab (wave 2)
+- [ ] 03-03-PLAN.md — OneSignal foreground listener + matchesSubscriptions pure function (wave 2, parallel)
+- [ ] 03-04-PLAN.md — CacheIndicator (UX-05) + isFromCacheProvider + "Suivre cette marque" button (wave 3)
 
 ---
 
