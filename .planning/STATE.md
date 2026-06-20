@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: milestone
 status: in_progress
-last_updated: "2026-06-18T00:00:00Z"
+last_updated: "2026-06-20T00:00:00Z"
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
-  percent: 17
+  total_plans: 8
+  completed_plans: 8
+  percent: 33
 ---
 
 # Project State: VigilConso v2.0
@@ -19,11 +19,11 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-06-16)
 
 **Core value:** Permettre à tout consommateur français d'être alerté rapidement quand un produit qu'il utilise fait l'objet d'un rappel.
-**Current focus:** Phase 2 — Refactoring & Qualité Technique
+**Current focus:** Phase 2 → checkpoint humain puis Phase 3
 
 ## Current Status
 
-**Active Phase:** Phase 2 — Refactoring & Qualité Technique
+**Active Phase:** Phase 2 — Refactoring & Qualité Technique (implémentation complète, checkpoint humain en attente)
 **Phase Goal:** Codebase propre — modèle typé, architecture Riverpod, zéro duplication, bugs critiques corrigés.
 
 **What's done:**
@@ -37,14 +37,16 @@ See: `.planning/PROJECT.md` (updated 2026-06-16)
   - FilterPanel + persistance filtres (19 tests)
   - SearchHistoryService + autocomplétion (6 tests)
   - ReadStatusService + badge NON LU (10 tests)
+- [x] Phase 2 — Refactoring & Qualité IMPLEMENTED (4/4 plans, 74/74 tests, **human checkpoint pending**)
+  - Rappel model typé + ImageUtils + DateUtils (02-01)
+  - Riverpod providers + FavoritesScreen shimmer (02-02)
+  - Bug fixes: barcode v2.1, contact HTTP POST, Lock favoris, camera lifecycle (02-03)
+  - RappelDetailsPage enrichi: dates, lots, action bar sticky, URL fix + favorites_shimmer_test (02-04)
 
 **What's next:**
 
-- Phase 2 — **Discuss → Plan → Execute**
-  - TECH-01: Modèle `Rappel` typé avec `fromJson`
-  - TECH-02: Migration Riverpod (providers pour services)
-  - TECH-03 à TECH-10: Extractions utilitaires + bugs critiques
-  - UX-02 à UX-04: Page de détail enrichie + navigation + shimmer
+- Phase 2 — **Human checkpoint** (vérification sur device : page détail, shimmer favoris, fiche officielle)
+- Phase 3 — Alertes Personnalisées (après validation humaine Phase 2)
 
 ## Workflow
 
@@ -60,7 +62,7 @@ See: `.planning/PROJECT.md` (updated 2026-06-16)
 | Phase | Status | Completed |
 |-------|--------|-----------|
 | 1 — Recherche & Filtres | ✅ Complete | 2026-06-18 |
-| 2 — Refactoring & Qualité | 🟡 Next | — |
+| 2 — Refactoring & Qualité | 🟠 Checkpoint | 2026-06-20 (human verify pending) |
 | 3 — Alertes Personnalisées | ⬜ Pending | — |
 | 4 — Mode Offline | ⬜ Pending | — |
 | 5 — Widget Home Screen | ⬜ Pending | — |
