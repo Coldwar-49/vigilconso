@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vigiconso/screens/home_screen.dart' as custom;
 import 'package:vigiconso/screens/categories_screen.dart';
 import 'package:vigiconso/screens/favorites_screen.dart';
+import 'package:vigiconso/screens/alertes_screen.dart';
 import 'package:vigiconso/screens/barcode_scanner.dart';
 import 'package:vigiconso/services/alerts_notifier.dart';
 
@@ -19,6 +20,7 @@ class _MainScreenState extends State<MainScreen> {
     custom.HomeScreen(),
     CategoriesScreen(),
     FavoritesScreen(),
+    AlertesScreen(),
     BarcodeScannerPage(),
   ];
 
@@ -60,6 +62,11 @@ class _MainScreenState extends State<MainScreen> {
               icon: Icon(Icons.favorite_outline),
               selectedIcon: Icon(Icons.favorite),
               label: 'Favoris',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.notifications_none_outlined),
+              selectedIcon: Icon(Icons.notifications),
+              label: 'Alertes',
             ),
             const NavigationDestination(
               icon: Icon(Icons.qr_code_scanner_outlined),
