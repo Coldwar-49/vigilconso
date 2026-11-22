@@ -29,8 +29,8 @@
 - [x] **ALRT-01**: L'utilisateur peut suivre des marques spécifiques (ex: Nutella, Samsung)
 - [x] **ALRT-02**: L'utilisateur peut suivre des catégories (ex: Alimentation, Électroménager)
 - [ ] **ALRT-03**: L'utilisateur reçoit une notification push quand un nouveau rappel correspond à une marque ou catégorie suivie
-- [ ] **ALRT-04**: L'utilisateur peut gérer sa liste d'abonnements (ajouter, supprimer)
-- [ ] **ALRT-05**: L'utilisateur peut voir un fil dédié aux rappels de ses marques/catégories suivies
+- [x] **ALRT-04**: L'utilisateur peut gérer sa liste d'abonnements (ajouter, supprimer)
+- [x] **ALRT-05**: L'utilisateur peut voir un fil dédié aux rappels de ses marques/catégories suivies
 
 ### Mode Offline
 
@@ -106,8 +106,8 @@
 | ALRT-01 | Phase 3 | Complete |
 | ALRT-02 | Phase 3 | Complete |
 | ALRT-03 | Phase 3 | Pending |
-| ALRT-04 | Phase 3 | Pending |
-| ALRT-05 | Phase 3 | Pending |
+| ALRT-04 | Phase 3 | Complete |
+| ALRT-05 | Phase 3 | Complete |
 | OFFL-01 | Phase 4 | Pending |
 | OFFL-02 | Phase 4 | Pending |
 | OFFL-03 | Phase 4 | Pending |

@@ -8,8 +8,8 @@ progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 12
-  completed_plans: 8
-  percent: 67
+  completed_plans: 9
+  percent: 75
 ---
 
 # Project State: VigilConso v2.0
