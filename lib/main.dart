@@ -1,9 +1,12 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vigiconso/screens/main_screen.dart';
 import 'package:vigiconso/screens/onboarding_screen.dart';
 import 'package:vigiconso/services/subscribe_to_newsletter.dart' show NotificationService;
+import 'package:vigiconso/services/subscription_service.dart';
 
 const String _oneSignalAppId = String.fromEnvironment(
   'ONESIGNAL_APP_ID',
@@ -17,6 +20,28 @@ void main() async {
   // Guard: dart-define returns '' in flutter test — avoid crash
   if (_oneSignalAppId.isNotEmpty) {
     NotificationService.initialize(_oneSignalAppId);
+    // ALRT-03: suppress foreground notifications not matching subscriptions.
+    // T-3-03: additionalData is only used for matching, never as a URL.
+    // Subscriptions are read inside the callback to avoid stale data.
+    OneSignal.Notifications.addForegroundWillDisplayListener(
+      (OSNotificationWillDisplayEvent event) async {
+        final data = event.notification.additionalData;
+        if (data == null) {
+          event.notification.display();
+          return;
+        }
+        final marque = (data['marque'] as String? ?? '').toLowerCase();
+        final categorie = (data['categorie'] as String? ?? '').toLowerCase();
+        final brands = await SubscriptionService.getBrands();
+        final categories = await SubscriptionService.getCategories();
+        if (SubscriptionService.matchesSubscriptions(
+            marque, categorie, brands, categories)) {
+          event.notification.display();
+        } else {
+          event.preventDefault();
+        }
+      },
+    );
   }
 
   final prefs = await SharedPreferences.getInstance();
