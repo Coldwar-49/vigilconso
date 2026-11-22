@@ -119,7 +119,7 @@ Plans:
 - [x] 03-01-PLAN.md — Subscriptions model + SubscriptionService + subscriptionProvider + Wave 0 test stubs (wave 1)
 - [x] 03-02-PLAN.md — mesAlertesProvider (derived filter) + AlertesScreen CRUD + MesAlertesScreen + 5th nav tab (wave 2)
 - [x] 03-03-PLAN.md — OneSignal foreground listener + matchesSubscriptions pure function (wave 2, parallel)
-- [ ] 03-04-PLAN.md — CacheIndicator (UX-05) + isFromCacheProvider + "Suivre cette marque" button (wave 3)
+- [x] 03-04-PLAN.md — CacheIndicator (UX-05) + isFromCacheProvider + "Suivre cette marque" button (wave 3)
 
 ---
 
