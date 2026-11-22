@@ -106,4 +106,22 @@ class SubscriptionService {
       // non-fatal
     }
   }
+
+  // -- Pure filter function (ALRT-03) ---------------------------------------
+  // Extracted for unit testing without OneSignal SDK mocks.
+  // Called from the main.dart foreground listener. Never reads a URL from payload (T-3-03).
+  static bool matchesSubscriptions(
+    String marque,
+    String categorie,
+    List<String> brands,
+    List<String> categories,
+  ) {
+    final brandMatch = brands.any(
+      (b) => marque.toLowerCase().contains(b.toLowerCase()),
+    );
+    final catMatch = categories.any(
+      (c) => categorie.toLowerCase().contains(c.toLowerCase()),
+    );
+    return brandMatch || catMatch;
+  }
 }
