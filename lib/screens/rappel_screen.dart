@@ -8,6 +8,7 @@ import 'package:vigiconso/services/read_status_service.dart';
 import 'package:vigiconso/utils/constants.dart';
 import 'package:vigiconso/utils/image_utils.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
+import 'package:vigiconso/widgets/cache_indicator.dart';
 import 'package:vigiconso/widgets/shimmer_loading.dart';
 
 class RappelListScreen extends ConsumerStatefulWidget {
@@ -428,6 +429,8 @@ class _RappelListScreenState extends ConsumerState<RappelListScreen>
               onSubmitted: (_) => _loadRappels(),
             ),
           ),
+
+          CacheIndicator(fromCache: ref.watch(isFromCacheProvider)),
 
           Expanded(
             child: rappelsAsync.when(
