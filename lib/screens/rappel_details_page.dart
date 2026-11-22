@@ -5,6 +5,7 @@ import 'package:vigiconso/utils/image_utils.dart';
 import 'package:vigiconso/widgets/app_menu.dart';
 import 'package:vigiconso/services/favorites_service.dart';
 import 'package:vigiconso/services/read_status_service.dart';
+import 'package:vigiconso/services/subscription_service.dart';
 
 class RappelDetailsPage extends StatefulWidget {
   final dynamic rappel;
@@ -65,6 +66,22 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
     }
   }
 
+  Future<void> _followBrand() async {
+    // Dynamic map access: widget.rappel is dynamic, not a typed Rappel.
+    final brand = widget.rappel['marque_produit']?.toString() ?? '';
+    if (brand.isEmpty) return;
+    await SubscriptionService.addBrand(brand);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Marque "$brand" suivie'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   void _shareRappel() {
     final title = widget.rappel['libelle'] ?? 'Produit rappelé';
     final brand = widget.rappel['marque_produit'] ?? widget.rappel['nom_marque'] ?? '';
@@ -118,6 +135,11 @@ class _RappelDetailsPageState extends State<RappelDetailsPage> {
                   ),
                   tooltip: _isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris',
                   onPressed: _toggleFavorite,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.notifications_none_outlined),
+                  tooltip: 'Suivre cette marque',
+                  onPressed: _followBrand,
                 ),
                 const AppMenu(),
               ],
