@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: milestone
-status: Phase 3 complete
+status: Phase 3 gaps found — gap closure needed
 last_updated: "2026-11-22T17:34:22.104Z"
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 2
   total_plans: 12
   completed_plans: 12
-  percent: 100
+  percent: 67
 ---
 
 # Project State: VigilConso v2.0
@@ -68,7 +68,7 @@ See: `.planning/PROJECT.md` (updated 2026-06-16)
 |-------|--------|-----------|
 | 1 — Recherche & Filtres | ✅ Complete | 2026-06-18 |
 | 2 — Refactoring & Qualité | ✅ Complete | 2026-06-20 |
-| 3 — Alertes Personnalisées | ✅ Complete | 2026-11-22 |
+| 3 — Alertes Personnalisées | ⚠ Gaps found (4/4 plans executed, verification gaps_found) | — |
 | 4 — Mode Offline | ⬜ Pending | — |
 | 5 — Widget Home Screen | ⬜ Pending | — |
 | 6 — Tests & Qualité Finale | ⬜ Pending | — |
