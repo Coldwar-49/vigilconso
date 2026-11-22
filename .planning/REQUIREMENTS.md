@@ -26,8 +26,8 @@
 
 ### Alertes Personnalisées
 
-- [ ] **ALRT-01**: L'utilisateur peut suivre des marques spécifiques (ex: Nutella, Samsung)
-- [ ] **ALRT-02**: L'utilisateur peut suivre des catégories (ex: Alimentation, Électroménager)
+- [x] **ALRT-01**: L'utilisateur peut suivre des marques spécifiques (ex: Nutella, Samsung)
+- [x] **ALRT-02**: L'utilisateur peut suivre des catégories (ex: Alimentation, Électroménager)
 - [ ] **ALRT-03**: L'utilisateur reçoit une notification push quand un nouveau rappel correspond à une marque ou catégorie suivie
 - [ ] **ALRT-04**: L'utilisateur peut gérer sa liste d'abonnements (ajouter, supprimer)
 - [ ] **ALRT-05**: L'utilisateur peut voir un fil dédié aux rappels de ses marques/catégories suivies
@@ -103,8 +103,8 @@
 | UX-03 | Phase 2 | Pending |
 | UX-04 | Phase 2 | Pending |
 | UX-05 | Phase 3 | Pending |
-| ALRT-01 | Phase 3 | Pending |
-| ALRT-02 | Phase 3 | Pending |
+| ALRT-01 | Phase 3 | Complete |
+| ALRT-02 | Phase 3 | Complete |
 | ALRT-03 | Phase 3 | Pending |
 | ALRT-04 | Phase 3 | Pending |
 | ALRT-05 | Phase 3 | Pending |

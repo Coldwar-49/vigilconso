@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: milestone
-status: in_progress
-last_updated: "2026-06-20T00:00:00Z"
+status: Executing Phase 3
+last_updated: "2026-11-22T17:34:22.104Z"
 progress:
   total_phases: 6
-  completed_phases: 1
-  total_plans: 8
+  completed_phases: 2
+  total_plans: 12
   completed_plans: 8
-  percent: 33
+  percent: 67
 ---
 
 # Project State: VigilConso v2.0
@@ -19,12 +19,12 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-06-16)
 
 **Core value:** Permettre à tout consommateur français d'être alerté rapidement quand un produit qu'il utilise fait l'objet d'un rappel.
-**Current focus:** Phase 2 → checkpoint humain puis Phase 3
+**Current focus:** Phase 3 — Alertes Personnalisées
 
 ## Current Status
 
-**Active Phase:** Phase 2 — Refactoring & Qualité Technique (implémentation complète, checkpoint humain en attente)
-**Phase Goal:** Codebase propre — modèle typé, architecture Riverpod, zéro duplication, bugs critiques corrigés.
+**Active Phase:** Phase 3 — Alertes Personnalisées
+**Phase Goal:** L'utilisateur reçoit automatiquement des notifications pour les rappels qui le concernent.
 
 **What's done:**
 
@@ -45,8 +45,13 @@ See: `.planning/PROJECT.md` (updated 2026-06-16)
 
 **What's next:**
 
-- Phase 2 — **Human checkpoint** (vérification sur device : page détail, shimmer favoris, fiche officielle)
-- Phase 3 — Alertes Personnalisées (après validation humaine Phase 2)
+- Phase 3 — **Discuss → Plan → Execute**
+  - ALRT-01: Suivre des marques
+  - ALRT-02: Suivre des catégories
+  - ALRT-03: Notification push lors d'un match
+  - ALRT-04: Gestion des abonnements (CRUD)
+  - ALRT-05: Fil dédié aux rappels suivis
+  - UX-05: Indicateur cache vs. temps réel
 
 ## Workflow
 
@@ -62,7 +67,7 @@ See: `.planning/PROJECT.md` (updated 2026-06-16)
 | Phase | Status | Completed |
 |-------|--------|-----------|
 | 1 — Recherche & Filtres | ✅ Complete | 2026-06-18 |
-| 2 — Refactoring & Qualité | 🟠 Checkpoint | 2026-06-20 (human verify pending) |
+| 2 — Refactoring & Qualité | ✅ Complete | 2026-06-20 |
 | 3 — Alertes Personnalisées | ⬜ Pending | — |
 | 4 — Mode Offline | ⬜ Pending | — |
 | 5 — Widget Home Screen | ⬜ Pending | — |
